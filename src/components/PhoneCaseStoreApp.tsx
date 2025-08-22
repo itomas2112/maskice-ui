@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { ShoppingCart } from "lucide-react";
 import API from "@/lib/api"; // adjust path if needed
 import { Header } from "@/components/layout/Header";
+import { Check } from "lucide-react"; // ✅ tick icon
 
 const EUR = (n: number) => new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(n);
 const BASE_PRICE = 3.0;
@@ -91,60 +92,89 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // --------- Kartica proizvoda ---------
 function ProductCard({
-  product,
-  model,
-  onAdd,
-  onQuickView,
+  product, model, onAdd, onQuickView, isShort = false,
 }: {
   product: Product;
   model: "iPhone 16" | "iPhone 16 Pro";
-  onAdd: (p: Product, color: string) => void;
-  onQuickView: (p: Product, color: string) => void;
+  onAdd: (p: Product, color: string, qty: number) => void;
+  onQuickView: (p: Product, color: string, qty: number) => void;
+  isShort?: boolean;
 }) {
   const [cardColor, setCardColor] = useState<string>(product.colors[0]);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [added, setAdded] = useState<boolean>(false);
 
-  return (
-    <div className="rounded-lg border overflow-hidden bg-white shadow h-[50vh] md:h-[45vh] lg:h-[42vh] flex flex-col">
-      {/* Slika ~58% visine kartice */}
-      <img
-        src={product.image}
-        alt={product.name}
-        className="w-full h-[58%] object-cover"
-      />
+  const handleAdd = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onAdd(product, cardColor, quantity);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1000);
+  };
 
-      {/* Sadržaj ispod */}
-      <div className="p-4 flex-1 flex flex-col">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <div className="font-semibold leading-snug">{product.name}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{model}</div>
-          </div>
-          <div className="text-lg font-bold">{EUR(BASE_PRICE)}</div>
-        </div>
-
-        <label className="block text-xs text-gray-600 mt-3">Boja</label>
+return (
+  <div
+    className="
+      rounded-lg border overflow-hidden bg-white shadow
+      flex flex-col cursor-pointer transition hover:shadow-md
+      w-full
+      aspect-[4/5]                     /* consistent ratio on all sizes */
+      min-h-[clamp(360px,38vh,560px)]  /* 👈 never too short or too tall */
+    "
+    onClick={() => onQuickView(product, cardColor, quantity)}
+  >
+   {/* Image area ~55% */}
+  <div className="basis-[75%] flex items-center justify-center p-2 overflow-hidden rounded-t-lg">
+    <img
+      src={product.image}
+      alt={product.name}
+      className="max-h-full max-w-full object-contain rounded-lg"
+    />
+  </div>
+  
+  {/* Content area ~45% */}
+  <div className="basis-[25%] px-4 pb-4 pt-2 flex flex-col gap-2">
+    <div className="flex items-start justify-between gap-2">
+      <div>
+        <div className="font-semibold leading-snug">{product.name}</div>
+        <div className="text-xs text-gray-500 mt-0.5">{model}</div>
+      </div>
+      <div className="text-lg font-bold">{EUR(BASE_PRICE)}</div>
+    </div>
+  
+    <div className="flex flex-col">
+      <label className="block text-xs text-gray-600 mb-1">Boja & Količina</label>
+      <div className="flex gap-2 sm:flex-row flex-col">
         <select
           value={cardColor}
           onChange={(e) => setCardColor(e.target.value)}
-          className="mt-1 w-full px-3 py-2 rounded-lg border"
+          className="flex-1 px-3 py-2 rounded-lg border"
+          onClick={(e) => e.stopPropagation()}
         >
-          {product.colors.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
+          {product.colors.map((c) => <option key={c}>{c}</option>)}
         </select>
-
-        {/* Akcije na dnu kartice */}
-        <div className="mt-3 flex gap-2 mt-auto">
-          <Button className="flex-1" onClick={() => onAdd(product, cardColor)}>
-            Dodaj
-          </Button>
-          <Button variant="outline" className="flex-1" onClick={() => onQuickView(product, cardColor)}>
-            Brzi pregled
-          </Button>
-        </div>
+        <select
+          value={quantity}
+          onChange={(e) => setQuantity(Number(e.target.value))}
+          className="w-full sm:w-20 px-3 py-2 rounded-lg border"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {Array.from({ length: 11 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+        </select>
       </div>
     </div>
-  );
+  
+    <div className="mt-auto">
+      <Button
+        className={`w-full transition-colors duration-300 ${added ? "bg-gray-300 text-gray-700" : ""}`}
+        onClick={handleAdd}
+        disabled={added || quantity === 0}
+      >
+        {added ? <span className="flex items-center justify-center gap-1"><Check className="w-4 h-4" /> Dodano</span> : "Dodaj"}
+      </Button>
+    </div>
+  </div>
+  </div>
+);
 }
 
 // --------- Bočni "drawer" ---------
@@ -185,6 +215,8 @@ export default function Page() {
   const [quote, setQuote] = useState<QuoteOut | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [width, setWidth] = useState<number>(0);
+  const [height, setHeight] = useState<number>(0);
 
 
   // Stanje za Brzi pregled
@@ -206,19 +238,17 @@ export default function Page() {
     customer.postal_code.trim() &&
     customer.country.trim();
 
-  const addToCart = (p: Product, color: string) =>
+  const addToCart = (p: Product, color: string, qty: number = 1) =>
     setCart((c) => {
       const idx = c.findIndex(
         (x) => x.productId === p.id && x.model === catalogModel && x.color === color
       );
       if (idx !== -1) {
-        // ista stavka → povećaj količinu
         const next = [...c];
-        next[idx] = { ...next[idx], qty: next[idx].qty + 1 };
+        next[idx] = { ...next[idx], qty: next[idx].qty + qty }; // 🔑 add exactly selected qty
         return next;
       }
-      // nova stavka
-      return [...c, { model: catalogModel, color, qty: 1, productId: p.id }];
+      return [...c, { model: catalogModel, color, qty, productId: p.id }]; // 🔑 start with selected qty
     });
 
   const keyOf = (x: { productId: string; model: "iPhone 16" | "iPhone 16 Pro"; color: string }) =>
@@ -316,7 +346,22 @@ export default function Page() {
       setCreating(false);
     }
   };
-
+  
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    handleResize(); // set immediately on mount
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+  useEffect(() => {
+    const handleResize = () => setHeight(window.innerHeight);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+  
+  const isMobile = width < 980;
+  const isShort = height > 0 && height < 720; // tweak threshold if you like
 
   return (
     <div id="top" className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50">
@@ -329,42 +374,43 @@ export default function Page() {
 
       <main className="max-w-7xl mx-auto px-4 py-20 md:py-28 space-y-16">
         {/* Hero */}
-      <section className="flex flex-col md:flex-row items-center gap-10 md:gap-14 min-h-[52vh] md:min-h-[60vh]">
-        {/* Tekst – uvijek prvi */}
-        <div className="w-full md:flex-1">
-          <h1 className="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight mb-5">
-            Maskica {EUR(BASE_PRICE)}.
-          </h1>
-          <h1 className="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight mb-5">
-            Staklo {EUR(BASE_PRICE)}.
-          </h1>
-          <p className="mt-4 text-gray-600 max-w-prose">
-            Jednostavan dizajn. Isporuka u roku 0-2 dana.
-          </p>
-          <div className="mt-6 flex gap-3">
-            {/*<button*/}
-            {/*  onClick={() => scrollToId("#catalog")}*/}
-            {/*  className="px-4 py-2 rounded-lg bg-black text-white font-medium"*/}
-            {/*>*/}
-            {/*  Otvori katalog*/}
-            {/*</button>*/}
+        <section
+          className={`flex gap-10 md:gap-14 min-h-[30vh] ${
+            !isMobile ? "flex-row justify-between" : "flex-col"
+          } items-center`}
+        >
+          {/* Text – left or top */}
+          <div
+            className={`w-full flex-1 ${
+              !isMobile ? "text-left items-start" : "text-center items-center"
+            } flex flex-col`}
+          >
+            <h1 className="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight mb-5">
+              Maskica {EUR(BASE_PRICE)}.
+            </h1>
+            <h1 className="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight mb-5">
+              Staklo {EUR(BASE_PRICE)}.
+            </h1>
+            <p
+              className={`mt-4 text-gray-600 max-w-prose ${
+                !isMobile ? "" : "mx-auto"
+              }`}
+            >
+              Jednostavan dizajn. Isporuka u roku 0-2 dana.
+            </p>
           </div>
-        </div>
-      
-        {/* Slika – uvijek druga */}
-<div className="w-full md:flex-1 relative h-[56vh] sm:h-[62vh] md:h-[70vh] lg:h-[78vh] xl:h-[84vh] lg:-mr-12 xl:-mr-20">
-  {/* glow/sjena može ostati kako jest */}
-
-  <img
-    src="/iphone16pro_4k_transparent_png8.png"
-    alt="Maskica za iPhone"
-    className="absolute bottom-10 left-1/2 -translate-x-1/2
-               w-[100%] sm:w-[115%] md:w-[130%] lg:w-[145%] xl:w-[160%]
-               max-w-none drop-shadow-2xl animate-floatY
-               pointer-events-none select-none"
-  />
-</div>
-      </section>
+        
+          {/* Image – right or bottom */}
+          <div className="w-full flex-1 relative flex items-center justify-center">
+            <img
+              src="/iphone16pro_4k_transparent_png8.png"
+              alt="Maskica za iPhone"
+              className="w-[80%] md:w-[100%] lg:w-[120%] max-h-[60vh] object-contain
+                         drop-shadow-2xl animate-floatY
+                         pointer-events-none select-none"
+            />
+          </div>
+        </section>
 
         {/* Katalog s izborom modela */}
         <section id="catalog" className="space-y-4 scroll-mt-24 md:scroll-mt-28">
@@ -385,13 +431,14 @@ export default function Page() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-2">
             {filtered.map((p) => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                model={catalogModel}
-                onAdd={(prod, color) => addToCart(prod, color)}
-                onQuickView={(prod, color) => setQuick({ product: prod, color })}
-              />
+              <div key={p.id} className="max-w-[420px] w-full mx-auto">   {/* ⬅️ NEW wrapper */}
+                <ProductCard
+                  product={p}
+                  model={catalogModel}
+                  onAdd={(prod, color, qty) => addToCart(prod, color, qty)}
+                  onQuickView={(prod, color, qty) => setQuick({ product: prod, color })}
+                />
+              </div>
             ))}
             {!filtered.length && (
               <div className="col-span-full text-center text-gray-600 border rounded-lg p-10">Nema rezultata.</div>
@@ -400,38 +447,45 @@ export default function Page() {
         </section>
 
         {/* Zašto mi? */}
-        <section id="why" className="grid md:grid-cols-3 gap-4 scroll-mt-24 md:scroll-mt-28">
-          {[
-            { title: "Veleuvoz", text: "Kupujemo izravno od tvornica." },
-            { title: "Jedinstvena cijena", text: "Svaka maskica košta samo 3 €." },
-            { title: "EU skladište", text: "Brza dostava i jednostavan povrat." },
-          ].map((f) => (
-            <div key={f.title} className="rounded-lg border p-4">
-              <div className="font-medium">{f.title}</div>
-              <p className="text-sm text-gray-600 mt-1">{f.text}</p>
-            </div>
-          ))}
-        </section>
+        {/*<section id="why" className="grid md:grid-cols-3 gap-4 scroll-mt-24 md:scroll-mt-28">*/}
+        {/*  {[*/}
+        {/*    { title: "Veleuvoz", text: "Kupujemo izravno od tvornica." },*/}
+        {/*    { title: "Jedinstvena cijena", text: "Svaka maskica košta samo 3 €." },*/}
+        {/*    { title: "EU skladište", text: "Brza dostava i jednostavan povrat." },*/}
+        {/*  ].map((f) => (*/}
+        {/*    <div key={f.title} className="rounded-lg border p-4">*/}
+        {/*      <div className="font-medium">{f.title}</div>*/}
+        {/*      <p className="text-sm text-gray-600 mt-1">{f.text}</p>*/}
+        {/*    </div>*/}
+        {/*  ))}*/}
+        {/*</section>*/}
       </main>
 
       <footer className="border-t mt-16" id="contact">
         <div className="max-w-7xl mx-auto px-4 py-10 grid md:grid-cols-3 gap-8">
           <div>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center font-bold">€</div>
-              <span className="font-semibold">Maske za mobitel</span>
+              <a
+                href="#top"
+                onClick={goTop}
+                className="flex items-center gap-2 select-none"
+                aria-label="Na vrh stranice"
+              >
+                <span className="inline-flex h-6 w-6 rounded-full bg-gradient-to-tr from-zinc-900 to-zinc-700 ring-1 ring-black/10 shadow-sm" />
+                <span className="font-semibold tracking-tight">maskino</span>
+              </a>
             </div>
-            <p className="mt-3 text-sm text-gray-600 max-w-prose">
-              Uvozimo izravno od proizvođača i šaljemo u naš EU hub — zato možemo prodavati vrhunske maskice za 3 €.
-              PDV uključen.
-            </p>
+            {/*<p className="mt-3 text-sm text-gray-600 max-w-prose">*/}
+            {/*  Uvozimo izravno od proizvođača i šaljemo u naš EU hub — zato možemo prodavati vrhunske maskice za 3 €.*/}
+            {/*  PDV uključen.*/}
+            {/*</p>*/}
           </div>
           <div id="faq">
             <h4 className="font-semibold">Česta pitanja</h4>
             <ul className="mt-3 text-sm text-gray-700 space-y-2">
-              <li><span className="font-medium">Zašto tako jeftino?</span> Kupujemo na veliko i držimo niske marže — ušteda ide vama.</li>
-              <li><span className="font-medium">Povrat?</span> Povrat novca u roku 30 dana, bez pitanja.</li>
-              <li><span className="font-medium">Dostava?</span> 48–72 h u HR/EU. Besplatno iznad 25 €.</li>
+              <li><span className="font-medium">Zašto tako jeftino?</span> Kupujemo na veliko i držimo niske marže.</li>
+              <li><span className="font-medium">Povrat?</span> Povrat novca u roku 30 dana, ako je proizvod oštećen.</li>
+              <li><span className="font-medium">Dostava?</span>Unutar 24 sata narudžba će biti uručena u BoxNow. Unutar 0–48h u HR. Besplatno iznad 20€. Dostava se radi preko </li>
             </ul>
           </div>
           <div>
