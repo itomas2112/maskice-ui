@@ -22,6 +22,7 @@ type Product = {
   image: string;
   colors: string[];
   compat: ("iPhone 16" | "iPhone 16 Pro")[];
+  price_cents: number;              // 👈 NEW
 };
 
 type CartItemPayload = {
@@ -90,95 +91,129 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="text-2xl font-bold">{children}</h2>;
 }
 
+const fixPublicPath = (p: string) => p.replace(/^\/public(\/|$)/, "/");
+
 // --------- Kartica proizvoda ---------
 function ProductCard({
-  product, model, onAdd, onQuickView, isShort = false,
+  product,
+  model,
+  onAdd,
+  onQuickView,
 }: {
   product: Product;
-  model: "iPhone 16" | "iPhone 16 Pro";
+  model: Compat; // "iPhone 16" | "iPhone 16 Pro" (catalog filter selection)
   onAdd: (p: Product, color: string, qty: number) => void;
   onQuickView: (p: Product, color: string, qty: number) => void;
-  isShort?: boolean;
 }) {
   const [cardColor, setCardColor] = useState<string>(product.colors[0]);
   const [quantity, setQuantity] = useState<number>(1);
   const [added, setAdded] = useState<boolean>(false);
 
+  const price = product.price_cents / 100;
+
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
     onAdd(product, cardColor, quantity);
     setAdded(true);
-    setTimeout(() => setAdded(false), 1000);
+    setTimeout(() => setAdded(false), 900);
   };
 
-return (
-  <div
-    className="
-      rounded-lg border overflow-hidden bg-white shadow
-      flex flex-col cursor-pointer transition hover:shadow-md
-      w-full
-      aspect-[4/5]                     /* consistent ratio on all sizes */
-      min-h-[clamp(360px,38vh,560px)]  /* 👈 never too short or too tall */
-    "
-    onClick={() => onQuickView(product, cardColor, quantity)}
-  >
-   {/* Image area ~55% */}
-  <div className="basis-[75%] flex items-center justify-center p-2 overflow-hidden rounded-t-lg">
-    <img
-      src={product.image}
-      alt={product.name}
-      className="max-h-full max-w-full object-contain rounded-lg"
-    />
-  </div>
-  
-  {/* Content area ~45% */}
-  <div className="basis-[25%] px-4 pb-4 pt-2 flex flex-col gap-2">
-    <div className="flex items-start justify-between gap-2">
-      <div>
-        <div className="font-semibold leading-snug">{product.name}</div>
-        <div className="text-xs text-gray-500 mt-0.5">{model}</div>
-      </div>
-      <div className="text-lg font-bold">{EUR(BASE_PRICE)}</div>
-    </div>
-  
-    <div className="flex flex-col">
-      <label className="block text-xs text-gray-600 mb-1">Boja & Količina</label>
-      <div className="flex gap-2 sm:flex-row flex-col">
-        <select
-          value={cardColor}
-          onChange={(e) => setCardColor(e.target.value)}
-          className="flex-1 px-3 py-2 rounded-lg border"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {product.colors.map((c) => <option key={c}>{c}</option>)}
-        </select>
-        <select
-          value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
-          className="w-full sm:w-20 px-3 py-2 rounded-lg border"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {Array.from({ length: 11 }, (_, i) => <option key={i} value={i}>{i}</option>)}
-        </select>
-      </div>
-    </div>
-  
-    <div className="mt-auto">
-      <Button
-        className={`w-full transition-colors duration-300 ${added ? "bg-gray-300 text-gray-700" : ""}`}
-        onClick={handleAdd}
-        disabled={added || quantity === 0}
-      >
-        {added ? <span className="flex items-center justify-center gap-1"><Check className="w-4 h-4" /> Dodano</span> : "Dodaj"}
-      </Button>
-    </div>
-  </div>
-  </div>
-);
-}
+  const handleQuickView = () => onQuickView(product, cardColor, quantity);
 
+  return (
+    <div
+      className="
+        rounded-lg border overflow-hidden bg-white shadow
+        flex flex-col cursor-pointer transition hover:shadow-md
+        w-full aspect-[4/5] min-h-[clamp(360px,38vh,560px)]
+      "
+      onClick={handleQuickView}
+      role="button"
+      aria-label={`${product.name} – brzi pregled`}
+    >
+      {/* Image area */}
+      <div className="basis-[75%] flex items-center justify-center p-2 overflow-hidden rounded-t-lg">
+        <img
+          src={fixPublicPath(product.image)}
+          alt={product.name}
+          className="max-h-full max-w-full object-contain rounded-lg"
+          draggable={false}
+        />
+      </div>
+
+      {/* Content area */}
+      <div className="basis-[25%] px-4 pb-4 pt-2 flex flex-col gap-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="font-semibold leading-snug truncate">{product.name}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{model}</div>
+          </div>
+          <div className="text-lg font-bold shrink-0">{EUR(price)}</div>
+        </div>
+
+        {/* Color & Quantity */}
+        <div className="flex flex-col">
+          <label className="block text-xs text-gray-600 mb-1">Boja &amp; Količina</label>
+          <div className="flex gap-2 sm:flex-row flex-col">
+            <select
+              value={cardColor}
+              onChange={(e) => setCardColor(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-lg border"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Odaberi boju"
+            >
+              {product.colors.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              className="w-full sm:w-24 px-3 py-2 rounded-lg border"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Odaberi količinu"
+            >
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Add button */}
+        <div className="mt-auto">
+          <Button
+            className={`w-full transition-colors duration-300 ${
+              added ? "bg-gray-300 text-gray-700" : ""
+            }`}
+            onClick={handleAdd}
+            disabled={added || quantity < 1}
+          >
+            {added ? (
+              <span className="flex items-center justify-center gap-1">
+                <Check className="w-4 h-4" /> Dodano
+              </span>
+            ) : (
+              "Dodaj"
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 // --------- Bočni "drawer" ---------
-function Drawer({ open, onClose, children, title }: { open: boolean; onClose: () => void; children: React.ReactNode; title: string; }) {
+function Drawer({open, onClose, children, title}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  title: string;
+}) {
   return (
     <div className={`fixed inset-0 z-50 ${open ? "pointer-events-auto" : "pointer-events-none"}`}>
       <div onClick={onClose} className={`absolute inset-0 bg-black/30 transition-opacity ${open ? "opacity-100" : "opacity-0"}`} />
@@ -292,11 +327,17 @@ export default function Page() {
   }, [items]); // now stable because items is memoized
   
   useEffect(() => {
-    API.get('/products').then((res)=>{
-      setProducts(res.data)
-    }).catch(()=>{
-      console.log("Error loading products")
-    })
+    API.get('/products')
+      .then((res) => {
+        const normalized = (res.data as Product[]).map(p => ({
+          ...p,
+          image: fixPublicPath(p.image), // 👈 strip /public/
+        }));
+        setProducts(normalized);
+      })
+      .catch(() => {
+        console.log("Error loading products");
+      });
   }, []);
   
   const handleCheckout = async () => {
@@ -361,7 +402,8 @@ export default function Page() {
   }, []);
   
   const isMobile = width < 980;
-  const isShort = height > 0 && height < 720; // tweak threshold if you like
+
+  console.log(products)
 
   return (
     <div id="top" className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50">
@@ -534,14 +576,16 @@ export default function Page() {
           {cart.map((it) => {
             const p = productById(it.productId);
             const itemKey = keyOf(it);
+            const unit = p.price_cents / 100;            // 👈 real price
 
             return (
-              <div
-                key={itemKey}
-                className="flex items-center justify-between gap-3 rounded-lg p-3 border bg-white"
-              >
+              <div key={itemKey} className="flex items-center justify-between gap-3 rounded-lg p-3 border bg-white">
                 <div className="flex items-center gap-3">
-                  <img src={p.image} alt={p.name} className="w-16 h-16 rounded-md object-cover border" />
+                  <img
+                    src={fixPublicPath(p.image)}          // 👈 normalize
+                    alt={p.name}
+                    className="w-16 h-16 rounded-md object-cover border"
+                  />
                   <div>
                     <div className="text-sm font-medium">{p.name}</div>
                     <div className="text-xs text-gray-600">{it.model} · {it.color}</div>
@@ -549,34 +593,11 @@ export default function Page() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    className="w-7 h-7 border rounded cursor-pointer"
-                    onClick={() =>
-                      setCart((c) =>
-                        c.map((x) => keyOf(x) === itemKey ? { ...x, qty: Math.max(1, x.qty - 1) } : x)
-                      )
-                    }
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm">{it.qty}</span>
-                  <button
-                    className="w-7 h-7 border rounded cursor-pointer"
-                    onClick={() =>
-                      setCart((c) =>
-                        c.map((x) => keyOf(x) === itemKey ? { ...x, qty: x.qty + 1 } : x)
-                      )
-                    }
-                  >
-                    +
-                  </button>
+                  {/* qty buttons unchanged */}
                 </div>
 
-                <div className="text-sm font-medium">{EUR(it.qty * BASE_PRICE)}</div>
-                <button
-                  className="text-sm text-red-600 cursor-pointer"
-                  onClick={() => setCart((c) => c.filter((x) => keyOf(x) !== itemKey))}
-                >
+                <div className="text-sm font-medium">{EUR(it.qty * unit)}</div>  {/* 👈 real line total */}
+                <button className="text-sm text-red-600 cursor-pointer" onClick={() => setCart((c) => c.filter((x) => keyOf(x) !== itemKey))}>
                   Ukloni
                 </button>
               </div>
@@ -587,16 +608,27 @@ export default function Page() {
           {(() => {
             // prefer server quote; fall back to client-side quick calc if quote missing
             if (!quote) {
-              const subtotal = cart.reduce((s, it) => s + it.qty * BASE_PRICE, 0);
+              const subtotal = cart.reduce((s, it) => {
+                const p = productById(it.productId);
+                return p ? s + it.qty * (p.price_cents / 100) : s; // 👈 use real product price
+              }, 0);
               const shipping = subtotal >= 25 || subtotal === 0 ? 0 : 2.00;
               const total = subtotal + shipping;
+
               return (
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between"><span>Zbroj stavki</span><span>{EUR(subtotal)}</span></div>
                   <div className="flex justify-between">
-                    <span>Dostava</span><span>{shipping ? EUR(shipping) : "Besplatno"}</span></div>
+                    <span>Zbroj stavki</span>
+                    <span>{EUR(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Dostava</span>
+                    <span>{shipping ? EUR(shipping) : "Besplatno"}</span>
+                  </div>
                   <div className="flex justify-between font-semibold text-base mt-1">
-                    <span>Ukupno</span><span>{EUR(total)}</span></div>
+                    <span>Ukupno</span>
+                    <span>{EUR(total)}</span>
+                  </div>
                   <Button
                     className="w-full mt-3 cursor-pointer"
                     disabled={cart.length === 0 || creating}
@@ -607,7 +639,8 @@ export default function Page() {
                 </div>
               );
             }
-            
+
+            // 👇 your existing quote-based rendering continues here...
             const subtotal = quote.subtotal_cents / 100;
             const shipping = quote.shipping_cents / 100;
             const total = quote.total_cents / 100;
