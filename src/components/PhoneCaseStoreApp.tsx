@@ -4,33 +4,35 @@
 
 "use client";
 
-import React, {useEffect, useMemo, useState} from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { ShoppingCart } from "lucide-react";
 import API from "@/lib/api"; // adjust path if needed
 import { Header } from "@/components/layout/Header";
 import { Check } from "lucide-react"; // ✅ tick icon
 
-const EUR = (n: number) => new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(n);
+const EUR = (n: number) =>
+  new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(n);
 const BASE_PRICE = 3.0;
 
 // Katalog — mali i fokusiran
+type BackendProduct = {
+  id: string;
+  name: string;
+  compat: string; // backend sends a single model string
+  price_cents: number;
+  variants: { colors: string; image: string }[];
+};
+
 type Product = {
   id: string;
   name: string;
-  image: string;
+  compat: Compat;                 // single model
+  price_cents: number;
   colors: string[];
-  compat: ("iPhone 16" | "iPhone 16 Pro")[];
-  price_cents: number;              // 👈 NEW
+  imageByColor: Record<string, string>; // color -> image
+  defaultColor: string;
 };
 
-type CartItemPayload = {
-  product_id: string;
-  qty: number;
-  color: string;
-  model: Compat;
-};
 
 type QuoteItemOut = {
   product_id: string;
@@ -47,28 +49,6 @@ type QuoteOut = {
   subtotal_cents: number;
   shipping_cents: number;
   total_cents: number;
-};
-
-type OrderItemOut = {
-  id: string;
-  product_id: string;
-  product_name: string;
-  image: string;
-  color: string;
-  model: Compat;
-  qty: number;
-  unit_price_cents: number;
-  line_total_cents: number;
-};
-
-type OrderOut = {
-  id: string;
-  status: string;
-  currency: string;
-  subtotal_cents: number;
-  shipping_cents: number;
-  total_cents: number;
-  items: OrderItemOut[];
 };
 
 type Customer = {
@@ -93,6 +73,31 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 const fixPublicPath = (p: string) => p.replace(/^\/public(\/|$)/, "/");
 
+const normalize = (bp: BackendProduct): Product | null => {
+  // guard for unknown models (keeps type safety while allowing backend to grow)
+  const compat = bp.compat as Compat;
+  if (!["iPhone 16", "iPhone 16 Pro"].includes(bp.compat)) return null;
+
+  const imageByColor: Record<string, string> = {};
+  const colors: string[] = [];
+  for (const v of bp.variants ?? []) {
+    const img = fixPublicPath(v.image);
+    imageByColor[v.colors] = img;
+    colors.push(v.colors);
+  }
+  const defaultColor = colors[0] ?? "Default";
+
+  return {
+    id: bp.id,
+    name: bp.name,
+    compat,
+    price_cents: bp.price_cents,
+    colors,
+    imageByColor,
+    defaultColor,
+  };
+};
+
 // --------- Kartica proizvoda ---------
 function ProductCard({
   product,
@@ -105,11 +110,12 @@ function ProductCard({
   onAdd: (p: Product, color: string, qty: number) => void;
   onQuickView: (p: Product, color: string, qty: number) => void;
 }) {
-  const [cardColor, setCardColor] = useState<string>(product.colors[0]);
+  const [cardColor, setCardColor] = useState<string>(product.defaultColor);
   const [quantity, setQuantity] = useState<number>(1);
   const [added, setAdded] = useState<boolean>(false);
 
   const price = product.price_cents / 100;
+  const imgSrc = product.imageByColor[cardColor] ?? product.imageByColor[product.defaultColor];
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -133,12 +139,12 @@ function ProductCard({
     >
       {/* Image area */}
       <div className="basis-[75%] flex items-center justify-center p-2 overflow-hidden rounded-t-lg">
-        <img
-          src={fixPublicPath(product.image)}
-          alt={product.name}
-          className="max-h-full max-w-full object-contain rounded-lg"
-          draggable={false}
-        />
+      <img
+        src={imgSrc}
+        alt={`${product.name} – ${cardColor}`}
+        className="max-h-full max-w-full object-contain rounded-lg"
+        draggable={false}
+      />
       </div>
 
       {/* Content area */}
@@ -207,8 +213,14 @@ function ProductCard({
     </div>
   );
 }
+
 // --------- Bočni "drawer" ---------
-function Drawer({open, onClose, children, title}: {
+function Drawer({
+  open,
+  onClose,
+  children,
+  title,
+}: {
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
@@ -216,11 +228,22 @@ function Drawer({open, onClose, children, title}: {
 }) {
   return (
     <div className={`fixed inset-0 z-50 ${open ? "pointer-events-auto" : "pointer-events-none"}`}>
-      <div onClick={onClose} className={`absolute inset-0 bg-black/30 transition-opacity ${open ? "opacity-100" : "opacity-0"}`} />
-      <aside className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow border-l transition-transform ${open ? "translate-x-0" : "translate-x-full"}`}>
+      <div
+        onClick={onClose}
+        className={`absolute inset-0 bg-black/30 transition-opacity ${
+          open ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      <aside
+        className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow border-l transition-transform ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
         <div className="p-4 border-b flex items-center justify-between">
           <h3 className="font-semibold">{title}</h3>
-          <button onClick={onClose} className="px-2 py-1 rounded-md border cursor-pointer">Zatvori</button>
+          <button onClick={onClose} className="px-2 py-1 rounded-md border cursor-pointer">
+            Zatvori
+          </button>
         </div>
         <div className="p-4 overflow-y-auto h-[calc(100%-56px)]">{children}</div>
       </aside>
@@ -230,7 +253,9 @@ function Drawer({open, onClose, children, title}: {
 
 export default function Page() {
   // Globalna košarica (pojednostavljeno)
-  const [cart, setCart] = useState<{ model: "iPhone 16" | "iPhone 16 Pro"; color: string; qty: number; productId: string }[]>([]);
+  const [cart, setCart] = useState<
+    { model: "iPhone 16" | "iPhone 16 Pro"; color: string; qty: number; productId: string }[]
+  >([]);
   const cartCount = useMemo(() => cart.reduce((s, it) => s + it.qty, 0), [cart]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customer, setCustomer] = useState<Customer>({
@@ -243,27 +268,25 @@ export default function Page() {
     postal_code: "",
     country: "HR",
   });
-  
+
   // Filtar kataloga — padajući izbornik
   const [catalogModel, setCatalogModel] = useState<"iPhone 16" | "iPhone 16 Pro">("iPhone 16");
-  
+
   const [quote, setQuote] = useState<QuoteOut | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [creating, setCreating] = useState(false);
   const [width, setWidth] = useState<number>(0);
-  const [height, setHeight] = useState<number>(0);
-
 
   // Stanje za Brzi pregled
   const [quick, setQuick] = useState<{ product: Product; color: string } | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
-  const productById = (id: string) => products.find(p => p.id === id)!;
+  const productById = (id: string) => products.find((p) => p.id === id);
 
   const filtered = useMemo(
-    () => products.filter((p) => p.compat.includes(catalogModel)),
-    [products, catalogModel] // ← add products here
+    () => products.filter((p) => p.compat === catalogModel),
+    [products, catalogModel]
   );
-  
+
   const formOk =
     customer.first_name.trim() &&
     customer.last_name.trim() &&
@@ -286,34 +309,33 @@ export default function Page() {
       return [...c, { model: catalogModel, color, qty, productId: p.id }]; // 🔑 start with selected qty
     });
 
-  const keyOf = (x: { productId: string; model: "iPhone 16" | "iPhone 16 Pro"; color: string }) =>
-    `${x.productId}-${x.model}-${x.color}`;
-  
+  const keyOf = (x: {
+    productId: string;
+    model: "iPhone 16" | "iPhone 16 Pro";
+    color: string;
+  }) => `${x.productId}-${x.model}-${x.color}`;
+
   const goTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  
-  const scrollToId = (id: string) => {
-    const el = document.querySelector(id) as HTMLElement | null;
-    if (!el) return;
-    const headerOffset = 72; // visina sticky headera
-    const y = el.getBoundingClientRect().top + window.scrollY - headerOffset;
-    window.scrollTo({ top: y, behavior: "smooth" });
-  };
-  
+
   const items = useMemo(
-    () => cart.map(it => ({
-      product_id: it.productId,
-      qty: it.qty,
-      color: it.color,
-      model: it.model,
-    })),
+    () =>
+      cart.map((it) => ({
+        product_id: it.productId,
+        qty: it.qty,
+        color: it.color,
+        model: it.model,
+      })),
     [cart]
   );
-  
+
   useEffect(() => {
-    if (items.length === 0) { setQuote({ items: [], subtotal_cents: 0, shipping_cents: 0, total_cents: 0 }); return; }
+    if (items.length === 0) {
+      setQuote({ items: [], subtotal_cents: 0, shipping_cents: 0, total_cents: 0 });
+      return;
+    }
     const fetchQuote = async () => {
       try {
         setQuoting(true);
@@ -325,39 +347,38 @@ export default function Page() {
     };
     fetchQuote();
   }, [items]); // now stable because items is memoized
-  
+
   useEffect(() => {
-    API.get('/products')
+    API.get("/products")
       .then((res) => {
-        const normalized = (res.data as Product[]).map(p => ({
-          ...p,
-          image: fixPublicPath(p.image), // 👈 strip /public/
-        }));
+        const normalized: Product[] = (res.data as BackendProduct[])
+          .map(normalize)
+          .filter((x): x is Product => !!x);
         setProducts(normalized);
       })
       .catch(() => {
-        console.log("Error loading products");
+        console.error("Error loading products");
       });
   }, []);
-  
+
   const handleCheckout = async () => {
     if (cart.length === 0) return;
-  
+
     if (!formOk) {
       alert("Molimo ispunite podatke za dostavu (ime, prezime, email, adresu).");
       return;
     }
-  
+
     try {
       setCreating(true);
-  
-      const items = cart.map(it => ({
+
+      const items = cart.map((it) => ({
         product_id: it.productId,
         qty: it.qty,
         color: it.color,
         model: it.model, // must be exactly "iPhone 16" or "iPhone 16 Pro"
       }));
-  
+
       // 🔧 map flat fields -> nested address expected by backend
       const payload = {
         items,
@@ -374,10 +395,9 @@ export default function Page() {
           },
         },
       };
-  
+
       const res = await API.post<CheckoutSessionResp>("/checkout/session", payload);
       window.location.href = res.data.checkout_url;
-      console.log(res.data)
     } catch (err: any) {
       // show exact FastAPI validation errors to debug quickly
       const detail = err?.response?.data?.detail ?? err.message;
@@ -387,32 +407,23 @@ export default function Page() {
       setCreating(false);
     }
   };
-  
+
   useEffect(() => {
     const handleResize = () => setWidth(window.innerWidth);
     handleResize(); // set immediately on mount
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-  useEffect(() => {
-    const handleResize = () => setHeight(window.innerHeight);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-  
+
   const isMobile = width < 980;
 
-  console.log(products)
-
   return (
-    <div id="top" className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50">
+    <div
+      id="top"
+      className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50"
+    >
       {/* Zaglavlje */}
-      <Header
-        cartCount={cartCount}
-        setCartOpen = {setCartOpen}
-      />
-
+      <Header cartCount={cartCount} setCartOpen={setCartOpen} />
 
       <main className="max-w-7xl mx-auto px-4 py-20 md:py-28 space-y-16">
         {/* Hero */}
@@ -433,15 +444,11 @@ export default function Page() {
             <h1 className="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight mb-5">
               Staklo {EUR(BASE_PRICE)}.
             </h1>
-            <p
-              className={`mt-4 text-gray-600 max-w-prose ${
-                !isMobile ? "" : "mx-auto"
-              }`}
-            >
+            <p className={`mt-4 text-gray-600 max-w-prose ${!isMobile ? "" : "mx-auto"}`}>
               Jednostavan dizajn. Isporuka u roku 0-2 dana.
             </p>
           </div>
-        
+
           {/* Image – right or bottom */}
           <div className="w-full flex-1 relative flex items-center justify-center">
             <img
@@ -462,7 +469,9 @@ export default function Page() {
               <label className="text-sm">Odaberi model</label>
               <select
                 value={catalogModel}
-                onChange={(e) => setCatalogModel(e.target.value as "iPhone 16" | "iPhone 16 Pro")}
+                onChange={(e) =>
+                  setCatalogModel(e.target.value as "iPhone 16" | "iPhone 16 Pro")
+                }
                 className="mt-1 w-full px-3 py-2 rounded-lg border"
               >
                 <option value="iPhone 16">iPhone 16</option>
@@ -473,7 +482,8 @@ export default function Page() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-2">
             {filtered.map((p) => (
-              <div key={p.id} className="max-w-[420px] w-full mx-auto">   {/* ⬅️ NEW wrapper */}
+              <div key={p.id} className="max-w-[420px] w-full mx-auto">
+                {/* ⬅️ NEW wrapper */}
                 <ProductCard
                   product={p}
                   model={catalogModel}
@@ -483,24 +493,12 @@ export default function Page() {
               </div>
             ))}
             {!filtered.length && (
-              <div className="col-span-full text-center text-gray-600 border rounded-lg p-10">Nema rezultata.</div>
+              <div className="col-span-full text-center text-gray-600 border rounded-lg p-10">
+                Nema rezultata.
+              </div>
             )}
           </div>
         </section>
-
-        {/* Zašto mi? */}
-        {/*<section id="why" className="grid md:grid-cols-3 gap-4 scroll-mt-24 md:scroll-mt-28">*/}
-        {/*  {[*/}
-        {/*    { title: "Veleuvoz", text: "Kupujemo izravno od tvornica." },*/}
-        {/*    { title: "Jedinstvena cijena", text: "Svaka maskica košta samo 3 €." },*/}
-        {/*    { title: "EU skladište", text: "Brza dostava i jednostavan povrat." },*/}
-        {/*  ].map((f) => (*/}
-        {/*    <div key={f.title} className="rounded-lg border p-4">*/}
-        {/*      <div className="font-medium">{f.title}</div>*/}
-        {/*      <p className="text-sm text-gray-600 mt-1">{f.text}</p>*/}
-        {/*    </div>*/}
-        {/*  ))}*/}
-        {/*</section>*/}
       </main>
 
       <footer className="border-t mt-16" id="contact">
@@ -517,34 +515,51 @@ export default function Page() {
                 <span className="font-semibold tracking-tight">maskino</span>
               </a>
             </div>
-            {/*<p className="mt-3 text-sm text-gray-600 max-w-prose">*/}
-            {/*  Uvozimo izravno od proizvođača i šaljemo u naš EU hub — zato možemo prodavati vrhunske maskice za 3 €.*/}
-            {/*  PDV uključen.*/}
-            {/*</p>*/}
           </div>
           <div id="faq">
             <h4 className="font-semibold">Česta pitanja</h4>
             <ul className="mt-3 text-sm text-gray-700 space-y-2">
-              <li><span className="font-medium">Zašto tako jeftino?</span> Kupujemo na veliko i držimo niske marže.</li>
-              <li><span className="font-medium">Povrat?</span> Povrat novca u roku 30 dana, ako je proizvod oštećen.</li>
-              <li><span className="font-medium">Dostava?</span>Unutar 24 sata narudžba će biti uručena u BoxNow. Unutar 0–48h u HR. Besplatno iznad 20€. Dostava se radi preko </li>
+              <li>
+                <span className="font-medium">Zašto tako jeftino?</span> Kupujemo na veliko i
+                držimo niske marže.
+              </li>
+              <li>
+                <span className="font-medium">Povrat?</span> Povrat novca u roku 30 dana, ako je
+                proizvod oštećen.
+              </li>
+              <li>
+                <span className="font-medium">Dostava?</span>Unutar 24 sata narudžba će biti
+                uručena u BoxNow. Unutar 0–48h u HR. Besplatno iznad 20€. Dostava se radi preko{" "}
+              </li>
             </ul>
           </div>
           <div>
             <h4 className="font-semibold">Kontakt</h4>
             <p className="mt-3 text-sm text-gray-700">Email: support@eurocase.example</p>
             <p className="text-sm text-gray-700">Instagram: @eurocase.shop</p>
-            <p className="text-xs text-gray-500 mt-4">© {new Date().getFullYear()} Maske za mobitel — Sva prava pridržana.</p>
+            <p className="text-xs text-gray-500 mt-4">
+              © {new Date().getFullYear()} Maske za mobitel — Sva prava pridržana.
+            </p>
           </div>
         </div>
       </footer>
 
       {/* Brzi pregled — model je zaključan na odabrani */}
-      <Drawer open={!!quick} onClose={() => setQuick(null)} title={quick ? quick.product.name : "Brzi pregled"}>
+      <Drawer
+        open={!!quick}
+        onClose={() => setQuick(null)}
+        title={quick ? quick.product.name : "Brzi pregled"}
+      >
         {quick && (
           <div className="space-y-4">
-            <img src={quick.product.image} alt={quick.product.name} className="w-full h-48 object-cover rounded-lg border" />
-            <div className="text-sm text-gray-600">Model: <span className="font-medium">{catalogModel}</span> (zaključano)</div>
+            <img
+              src={quick.product.imageByColor[quick.color] ?? quick.product.imageByColor[quick.product.defaultColor]}
+              alt={`${quick.product.name} – ${quick.color}`}
+              className="w-full h-48 object-cover rounded-lg border"
+            />
+            <div className="text-sm text-gray-600">
+              Model: <span className="font-medium">{catalogModel}</span> (zaključano)
+            </div>
 
             <div>
               <label className="text-sm">Boja</label>
@@ -560,10 +575,17 @@ export default function Page() {
             </div>
 
             <div className="flex gap-2">
-              <Button onClick={() => { addToCart(quick.product, quick.color); setQuick(null); }}>
+              <Button
+                onClick={() => {
+                  addToCart(quick.product, quick.color);
+                  setQuick(null);
+                }}
+              >
                 Dodaj u košaricu • {EUR(BASE_PRICE)}
               </Button>
-              <Button variant="outline" onClick={() => setQuick(null)}>Zatvori</Button>
+              <Button variant="outline" onClick={() => setQuick(null)}>
+                Zatvori
+              </Button>
             </div>
           </div>
         )}
@@ -576,28 +598,98 @@ export default function Page() {
           {cart.map((it) => {
             const p = productById(it.productId);
             const itemKey = keyOf(it);
-            const unit = p.price_cents / 100;            // 👈 real price
-
+          
+            // Gracefully handle missing/removed product
+            if (!p) {
+              return (
+                <div
+                  key={itemKey}
+                  className="flex items-center justify-between gap-3 rounded-lg p-3 border bg-white"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-md border bg-gray-100" />
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Nepoznat proizvod</div>
+                      <div className="text-xs text-gray-500">
+                        {it.model} · {it.color}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    className="text-sm text-red-600 cursor-pointer"
+                    onClick={() => setCart((c) => c.filter((x) => keyOf(x) !== itemKey))}
+                  >
+                    Ukloni
+                  </button>
+                </div>
+              );
+            }
+          
+            const unit = p.price_cents / 100;
+            const img = p.imageByColor[it.color] ?? p.imageByColor[p.defaultColor];
+          
             return (
-              <div key={itemKey} className="flex items-center justify-between gap-3 rounded-lg p-3 border bg-white">
+              <div
+                key={itemKey}
+                className="flex items-center justify-between gap-3 rounded-lg p-3 border bg-white"
+              >
                 <div className="flex items-center gap-3">
                   <img
-                    src={fixPublicPath(p.image)}          // 👈 normalize
-                    alt={p.name}
+                    src={img}
+                    alt={`${p.name} – ${it.color}`}
                     className="w-16 h-16 rounded-md object-cover border"
                   />
                   <div>
                     <div className="text-sm font-medium">{p.name}</div>
-                    <div className="text-xs text-gray-600">{it.model} · {it.color}</div>
+                    <div className="text-xs text-gray-600">
+                      {it.model} · {it.color}
+                    </div>
                   </div>
                 </div>
-
+          
+                {/* Qty controls */}
                 <div className="flex items-center gap-2">
-                  {/* qty buttons unchanged */}
+                  <button
+                    className="w-7 h-7 border rounded cursor-pointer"
+                    onClick={() =>
+                      setCart((c) =>
+                        c.map((x) =>
+                          keyOf(x) === itemKey ? { ...x, qty: Math.max(1, x.qty - 1) } : x
+                        )
+                      )
+                    }
+                    aria-label="Smanji količinu"
+                  >
+                    −
+                  </button>
+                  <input
+                    className="w-10 h-7 text-center border rounded"
+                    value={it.qty}
+                    onChange={(e) => {
+                      const v = Math.max(1, Number(e.target.value) || 1);
+                      setCart((c) => c.map((x) => (keyOf(x) === itemKey ? { ...x, qty: v } : x)));
+                    }}
+                    aria-label="Količina"
+                  />
+                  <button
+                    className="w-7 h-7 border rounded cursor-pointer"
+                    onClick={() =>
+                      setCart((c) =>
+                        c.map((x) => (keyOf(x) === itemKey ? { ...x, qty: x.qty + 1 } : x))
+                      )
+                    }
+                    aria-label="Povećaj količinu"
+                  >
+                    +
+                  </button>
                 </div>
-
-                <div className="text-sm font-medium">{EUR(it.qty * unit)}</div>  {/* 👈 real line total */}
-                <button className="text-sm text-red-600 cursor-pointer" onClick={() => setCart((c) => c.filter((x) => keyOf(x) !== itemKey))}>
+          
+                <div className="text-sm font-medium">{EUR(it.qty * unit)}</div>
+          
+                <button
+                  className="text-sm text-red-600 cursor-pointer"
+                  onClick={() => setCart((c) => c.filter((x) => keyOf(x) !== itemKey))}
+                >
                   Ukloni
                 </button>
               </div>
@@ -612,7 +704,7 @@ export default function Page() {
                 const p = productById(it.productId);
                 return p ? s + it.qty * (p.price_cents / 100) : s; // 👈 use real product price
               }, 0);
-              const shipping = subtotal >= 25 || subtotal === 0 ? 0 : 2.00;
+              const shipping = subtotal >= 25 || subtotal === 0 ? 0 : 2.0;
               const total = subtotal + shipping;
 
               return (
@@ -644,78 +736,99 @@ export default function Page() {
             const subtotal = quote.subtotal_cents / 100;
             const shipping = quote.shipping_cents / 100;
             const total = quote.total_cents / 100;
-            
+
             return (
               <div className="space-y-1 text-sm">
                 {quoting && <div className="text-xs text-gray-500">Računam cijene…</div>}
-                <div className="flex justify-between"><span>Zbroj stavki</span><span>{EUR(subtotal)}</span></div>
                 <div className="flex justify-between">
-                  <span>Dostava</span><span>{shipping ? EUR(shipping) : "Besplatno"}</span></div>
-                <div className="flex justify-between font-semibold text-base mt-1">
-                  <span>Ukupno</span><span>{EUR(total)}</span></div>
-                {/* NEW – Customer details form */}
-                {cartCount>0
-                  ?(<div className="mt-6 space-y-3 border rounded-lg p-3 bg-white">
-                  <div className="font-medium">Podaci za dostavu</div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      className="border rounded-md px-3 py-2"
-                      placeholder="Ime"
-                      value={customer.first_name}
-                      onChange={(e) => setCustomer({...customer, first_name: e.target.value})}
-                    />
-                    <input
-                      className="border rounded-md px-3 py-2"
-                      placeholder="Prezime"
-                      value={customer.last_name}
-                      onChange={(e) => setCustomer({...customer, last_name: e.target.value})}
-                    />
-                  </div>
-                  <input
-                    className="border rounded-md px-3 py-2 w-full"
-                    placeholder="Email"
-                    type="email"
-                    value={customer.email}
-                    onChange={(e) => setCustomer({...customer, email: e.target.value})}
-                  />
-                  <input
-                    className="border rounded-md px-3 py-2 w-full"
-                    placeholder="Adresa (ulica i broj)"
-                    value={customer.address_line1}
-                    onChange={(e) => setCustomer({...customer, address_line1: e.target.value})}
-                  />
-                  <input
-                    className="border rounded-md px-3 py-2 w-full"
-                    placeholder="Adresa 2 (opcionalno)"
-                    value={customer.address_line2 ?? ""}
-                    onChange={(e) => setCustomer({...customer, address_line2: e.target.value})}
-                  />
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <input
-                      className="border rounded-md px-3 py-2"
-                      placeholder="Grad"
-                      value={customer.city}
-                      onChange={(e) => setCustomer({...customer, city: e.target.value})}
-                    />
-                    <input
-                      className="border rounded-md px-3 py-2"
-                      placeholder="Poštanski broj"
-                      value={customer.postal_code}
-                      onChange={(e) => setCustomer({...customer, postal_code: e.target.value})}
-                    />
-                    <input
-                      className="border rounded-md px-3 py-2"
-                      placeholder="Država (npr. HR)"
-                      maxLength={2}
-                      value={customer.country}
-                      onChange={(e) => setCustomer({...customer, country: e.target.value.toUpperCase()})}
-                    />
-                  </div>
-                  {!formOk && (
-                    <div className="text-xs text-red-600">Molimo ispunite sva obavezna polja. Trenutno dostavljamo samo unutar RH.</div>
-                  )}
+                  <span>Zbroj stavki</span>
+                  <span>{EUR(subtotal)}</span>
                 </div>
-                  ):(<></>)}
+                <div className="flex justify-between">
+                  <span>Dostava</span>
+                  <span>{shipping ? EUR(shipping) : "Besplatno"}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-base mt-1">
+                  <span>Ukupno</span>
+                  <span>{EUR(total)}</span>
+                </div>
+                {/* NEW – Customer details form */}
+                {cartCount > 0 ? (
+                  <div className="mt-6 space-y-3 border rounded-lg p-3 bg-white">
+                    <div className="font-medium">Podaci za dostavu</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        className="border rounded-md px-3 py-2"
+                        placeholder="Ime"
+                        value={customer.first_name}
+                        onChange={(e) =>
+                          setCustomer({ ...customer, first_name: e.target.value })
+                        }
+                      />
+                      <input
+                        className="border rounded-md px-3 py-2"
+                        placeholder="Prezime"
+                        value={customer.last_name}
+                        onChange={(e) =>
+                          setCustomer({ ...customer, last_name: e.target.value })
+                        }
+                      />
+                    </div>
+                    <input
+                      className="border rounded-md px-3 py-2 w-full"
+                      placeholder="Email"
+                      type="email"
+                      value={customer.email}
+                      onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
+                    />
+                    <input
+                      className="border rounded-md px-3 py-2 w-full"
+                      placeholder="Adresa (ulica i broj)"
+                      value={customer.address_line1}
+                      onChange={(e) =>
+                        setCustomer({ ...customer, address_line1: e.target.value })
+                      }
+                    />
+                    <input
+                      className="border rounded-md px-3 py-2 w-full"
+                      placeholder="Adresa 2 (opcionalno)"
+                      value={customer.address_line2 ?? ""}
+                      onChange={(e) =>
+                        setCustomer({ ...customer, address_line2: e.target.value })
+                      }
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <input
+                        className="border rounded-md px-3 py-2"
+                        placeholder="Grad"
+                        value={customer.city}
+                        onChange={(e) => setCustomer({ ...customer, city: e.target.value })}
+                      />
+                      <input
+                        className="border rounded-md px-3 py-2"
+                        placeholder="Poštanski broj"
+                        value={customer.postal_code}
+                        onChange={(e) =>
+                          setCustomer({ ...customer, postal_code: e.target.value })
+                        }
+                      />
+                      <input
+                        className="border rounded-md px-3 py-2"
+                        placeholder="Država (npr. HR)"
+                        maxLength={2}
+                        value={customer.country}
+                        onChange={(e) =>
+                          setCustomer({ ...customer, country: e.target.value.toUpperCase() })
+                        }
+                      />
+                    </div>
+                    {!formOk && (
+                      <div className="text-xs text-red-600">
+                        Molimo ispunite sva obavezna polja. Trenutno dostavljamo samo unutar RH.
+                      </div>
+                    )}
+                  </div>
+                ) : null}
                 <Button
                   className="w-full mt-3 cursor-pointer"
                   disabled={cart.length === 0 || creating || quoting}
