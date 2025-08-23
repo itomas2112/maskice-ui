@@ -18,41 +18,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="text-2xl font-bold">{children}</h2>;
 }
 
-// --------- Lokalni Drawer za "Brzi pregled" ---------
-function Drawer({
-  open,
-  onClose,
-  children,
-  title,
-}: {
-  open: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <div className={`fixed inset-0 z-50 ${open ? "pointer-events-auto" : "pointer-events-none"}`}>
-      <div
-        onClick={onClose}
-        className={`absolute inset-0 bg-black/30 transition-opacity ${open ? "opacity-100" : "opacity-0"}`}
-      />
-      <aside
-        className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow border-l transition-transform ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">{title}</h3>
-          <button onClick={onClose} className="px-2 py-1 rounded-md border cursor-pointer">
-            Zatvori
-          </button>
-        </div>
-        <div className="p-4 overflow-y-auto h-[calc(100%-56px)]">{children}</div>
-      </aside>
-    </div>
-  );
-}
-
 export default function Page() {
   const { addToCart, quick, setQuick, setCartOpen, normalize } = useShop();
   const cartCount = useCartCount();
@@ -96,8 +61,7 @@ export default function Page() {
     availableTypes,
     availablePhones,
   } = useCatalogFilters(products);
-  console.log(type)
-  console.log(phone)
+
   return (
     <div id="top" className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50">
       {/* Zaglavlje */}
@@ -111,37 +75,6 @@ export default function Page() {
       />
 
       <main className="max-w-7xl mx-auto px-4 py-20 md:py-28 space-y-16">
-        {/* Hero */}
-        <section
-          className={`flex gap-10 md:gap-14 min-h-[30vh] ${
-            !isMobile ? "flex-row justify-between" : "flex-col"
-          } items-center`}
-        >
-          {/* Text – left or top */}
-          <div
-            className={`w-full flex-1 ${!isMobile ? "text-left items-start" : "text-center items-center"} flex flex-col`}
-          >
-            <h1 className="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight mb-5">
-              Maskica {EUR(BASE_PRICE)}.
-            </h1>
-            <h1 className="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight mb-5">
-              Staklo {EUR(BASE_PRICE)}.
-            </h1>
-            <p className={`mt-4 text-gray-600 max-w-prose ${!isMobile ? "" : "mx-auto"}`}>
-              Jednostavan dizajn. Isporuka u roku 0–2 dana.
-            </p>
-          </div>
-
-          {/* Image – right or bottom */}
-          <div className="w-full flex-1 relative flex items-center justify-center">
-            <img
-              src="/iphone16pro_4k_transparent_png8.png"
-              alt="Maskica za iPhone"
-              className="w-[80%] md:w-[100%] lg:w-[120%] max-h-[60vh] object-contain drop-shadow-2xl animate-floatY pointer-events-none select-none"
-            />
-          </div>
-        </section>
-
         {/* Katalog s izborom modela */}
         <section id="catalog" className="space-y-4 scroll-mt-24 md:scroll-mt-28">
           <SectionTitle>Istraži ponudu</SectionTitle>
@@ -213,50 +146,6 @@ export default function Page() {
           </div>
         </div>
       </footer>
-
-      {/* Brzi pregled — model zaključan na odabrani */}
-      <Drawer open={!!quick} onClose={() => setQuick(null)} title={quick ? quick.product.name : "Brzi pregled"}>
-        {quick && (
-          <div className="space-y-4">
-            <img
-              src={quick.product.imageByColor[quick.color] ?? quick.product.imageByColor[quick.product.defaultColor]}
-              alt={`${quick.product.name} – ${quick.color}`}
-              className="w-full h-48 object-cover rounded-lg border"
-            />
-            <div className="text-sm text-gray-600">
-              Model: <span className="font-medium">{model}</span> (zaključano)
-            </div>
-
-            <div>
-              <label className="text-sm">Boja</label>
-              <select
-                value={quick.color}
-                onChange={(e) => setQuick({ product: quick.product, color: e.target.value })}
-                className="mt-1 w-full px-3 py-2 rounded-lg border"
-              >
-                {quick.product.colors.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                onClick={() => {
-                  addToCart(quick.product, quick.color);
-                  setQuick(null);
-                  setCartOpen(true); // open cart after adding from Quick View
-                }}
-              >
-                Dodaj u košaricu • {EUR(BASE_PRICE)}
-              </Button>
-              <Button variant="outline" onClick={() => setQuick(null)}>
-                Zatvori
-              </Button>
-            </div>
-          </div>
-        )}
-      </Drawer>
     </div>
   );
 }

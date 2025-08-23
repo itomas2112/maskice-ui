@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { Compat, Product } from "@/lib/types";
+import type { Compat, Product, BackendProduct } from "@/lib/types";
 
 export type CartItem = { model: Compat; color: string; qty: number; productId: string };
 export type QuickState = { product: Product; color: string } | null;
@@ -15,6 +15,7 @@ type ShopContextType = {
   quick: QuickState;
   setQuick: React.Dispatch<React.SetStateAction<QuickState>>;
   addToCart: (p: Product, color: string, qty?: number, modelOverride?: Compat) => void;
+  normalize: (bp: BackendProduct) => Product | null;
 };
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
@@ -41,6 +42,38 @@ function isCartItemLike(x: unknown): x is CartItem {
     isCompat(obj.model)
   );
 }
+
+const fixPublicPath = (p: string) => p.replace(/^\/public(\/|$)/, "/");
+
+const normalize = (bp: BackendProduct): Product | null => {
+  const compat = bp.compat as Compat;
+  if (!["iPhone 16", "iPhone 16 Pro"].includes(bp.compat)) return null;
+
+  const imageByColor: Record<string, string> = {};
+  const productIdByColor: Record<string, string> = {};
+  const colors: string[] = [];
+
+  for (const v of bp.variants ?? []) {
+    imageByColor[v.colors] = fixPublicPath(v.image);
+    productIdByColor[v.colors] = String(v.product_id);
+    colors.push(v.colors);
+  }
+
+  const defaultColor = colors[0] ?? "Default";
+
+  return {
+    id: bp.id,
+    name: bp.name,
+    compat,
+    price_cents: bp.price_cents,
+    colors,
+    imageByColor,
+    productIdByColor,
+    defaultColor,
+    type: bp.type,   // ✅ keep type from backend
+    phone: bp.phone, // ✅ keep phone from backend
+  };
+};
 
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -137,7 +170,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ cart, setCart, cartOpen, setCartOpen, quick, setQuick, addToCart }),
+    () => ({ cart, setCart, cartOpen, setCartOpen, quick, setQuick, addToCart, normalize }),
     [cart, cartOpen, quick]
   );
 

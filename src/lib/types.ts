@@ -1,26 +1,26 @@
 export type Product = {
-  id: string; // keep backend group id for UI
+  id: string;
   name: string;
   compat: Compat;
   price_cents: number;
   colors: string[];
   imageByColor: Record<string, string>;
-  productIdByColor: Record<string, string>; // <-- NEW: color -> DB product_id
+  productIdByColor: Record<string, string>;
   defaultColor: string;
+  type: string;   // ← NEW
+  phone: string;  // ← NEW
 };
 
 export type Compat = "iPhone 16" | "iPhone 16 Pro";
 
 export type BackendProduct = {
-  id: string;                // UI slug from backend (keep for grouping)
+  id: string;
   name: string;
-  compat: string;
+  compat: Compat;
   price_cents: number;
-  variants: {                // each color variant now carries the DB id
-    product_id: string;      // <-- NEW
-    colors: string;
-    image: string;
-  }[];
+  type: string;
+  phone: string;
+  variants: { product_id: string; colors: string; image: string }[];
 };
 
 export type CartItem = {
