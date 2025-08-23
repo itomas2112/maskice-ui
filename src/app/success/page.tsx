@@ -5,36 +5,45 @@ import { useEffect, useRef, useState } from "react";
 import API from "@/lib/api";
 import { Header } from "@/components/layout/Header";
 
+type Status = "PENDING" | "COMPLETED" | "CANCELED" | "FAILED" | "LOADING";
+
 export default function SuccessPage() {
   const sp = useSearchParams();
   const router = useRouter();
   const orderId = sp.get("order_id");
-  const [status, setStatus] = useState<
-    "PENDING" | "COMPLETED" | "CANCELED" | "FAILED" | "LOADING"
-  >("LOADING");
+  const [status, setStatus] = useState<Status>("LOADING");
 
-  // ✅ precise type for setTimeout handle (works in both browser & Node types)
+  // works in both browser & Node type defs
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!orderId) return;
 
+    const asStatus = (val: unknown): Exclude<Status, "LOADING"> | null => {
+      const s = String(val ?? "").toUpperCase();
+      return ["PENDING", "COMPLETED", "CANCELED", "FAILED"].includes(s)
+        ? (s as Exclude<Status, "LOADING">)
+        : null;
+    };
+
     const fetchStatus = async () => {
       try {
         const r = await API.get(`/orders/${orderId}`);
-        setStatus(r.data.status as typeof status);
-        if (r.data.status === "PENDING") {
-          // re-schedule
+        const s = asStatus(r?.data?.status);
+        setStatus(s ?? "FAILED");
+        if (s === "PENDING") {
+          // re-schedule polling
           pollRef.current = setTimeout(fetchStatus, 1500);
         }
-      } catch (e) {
+      } catch {
+        // no unused var warning
         setStatus("FAILED");
       }
     };
 
     fetchStatus();
 
-    // ✅ cleanup
+    // cleanup timer on unmount or orderId change
     return () => {
       if (pollRef.current) clearTimeout(pollRef.current);
     };
@@ -43,25 +52,19 @@ export default function SuccessPage() {
   const niceCode = orderId ? orderId.split("-")[0].toUpperCase() : "—";
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50"> 
-      {/* ⬆️ same background class as homepage */}
-      
-      {/* Header without basket */}
-      <Header
-        showBasket={false}
-        cartCount={0}
-      />
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <Header showBasket={false} cartCount={0} />
 
       <main className="flex-1 flex items-center justify-center px-6">
         <div className="max-w-xl w-full bg-white shadow-lg rounded-xl p-8 text-center">
           <h1 className="text-3xl font-bold mb-4">Hvala na kupnji! 🎉</h1>
+
           <p className="text-gray-600 mb-2">
-            Broj narudžbe:{" "}
-            <span className="font-mono">{niceCode}</span>
+            Broj narudžbe: <span className="font-mono">{niceCode}</span>
           </p>
+
           <p className="text-gray-600 mb-6">
-            Status:{" "}
-            <b>{status === "LOADING" ? "Provjera..." : status}</b>
+            Status: <b>{status === "LOADING" ? "Provjera..." : status}</b>
           </p>
 
           <button
