@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import API from "@/lib/api";
 import { Header } from "@/components/layout/Header";
+import { useShop } from "@/contexts/shop"; // <-- add
 
 type Status = "PENDING" | "COMPLETED" | "CANCELED" | "FAILED" | "LOADING";
 
@@ -13,7 +14,24 @@ function SuccessContent() {
   const orderId = sp.get("order_id");
   const [status, setStatus] = useState<Status>("LOADING");
 
-  // works in both browser & Node type defs
+  // shop context
+  const { setCartOpen, setCart } = useShop(); // <-- add
+
+  // close the drawer on mount
+  useEffect(() => {
+    setCartOpen(false);
+  }, [setCartOpen]);
+
+  // clear cart once when completed
+  const clearedRef = useRef(false);
+  useEffect(() => {
+    if (status === "COMPLETED" && !clearedRef.current) {
+      setCart([]);               // updates context (and your persisted cart if you sync it there)
+      clearedRef.current = true;
+    }
+  }, [status, setCart]);
+
+  // polling
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -40,7 +58,6 @@ function SuccessContent() {
     };
 
     fetchStatus();
-
     return () => {
       if (pollRef.current) {
         clearTimeout(pollRef.current);
@@ -53,7 +70,7 @@ function SuccessContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <Header showBasket={false} cartCount={0} />
+      <Header showBasket={false} cartCount={0} /> {/* basket hidden here */}
 
       <main className="flex-1 flex items-center justify-center px-6">
         <div className="max-w-xl w-full bg-white shadow-lg rounded-xl p-8 text-center">
