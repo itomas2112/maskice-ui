@@ -8,45 +8,14 @@ import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/ProductCard";
 import { Product, BackendProduct, Compat } from "@/lib/types";
 import { useShop } from "@/contexts/shop";
+import {useCatalogFilters} from "@/hooks/useCatalogFilters";
 
 const fixPublicPath = (p: string) => p.replace(/^\/public(\/|$)/, "/");
 
-const normalize = (bp: BackendProduct): Product | null => {
-  const compat = bp.compat as Compat;
-  if (!["iPhone 16", "iPhone 16 Pro"].includes(bp.compat)) return null;
-
-  const imageByColor: Record<string, string> = {};
-  const productIdByColor: Record<string, string> = {};
-  const colors: string[] = [];
-  
-
-  for (const v of bp.variants ?? []) {
-    const img = fixPublicPath(v.image);
-    imageByColor[v.colors] = img;
-    productIdByColor[v.colors] = String(v.product_id); // normalize to string
-    colors.push(v.colors);
-  }
-
-  const defaultColor = colors[0] ?? "Default";
-
-  return {
-    id: bp.id, // keep group id; NOT the DB id
-    name: bp.name,
-    compat,
-    price_cents: bp.price_cents,
-    colors,
-    imageByColor,
-    productIdByColor, // <-- NEW
-    defaultColor,
-  };
-};
-
-
 export default function LikedPage() {
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [likedIds, setLikedIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
   const { addToCart, setQuick, cart, setCartOpen } = useShop();
+  const { products, loading } = useCatalogFilters()
   
   const cartCount = useMemo(() => cart.reduce((s, it) => s + it.qty, 0), [cart]);
 
@@ -60,33 +29,9 @@ export default function LikedPage() {
     }
   }, []);
 
-  // fetch all products
-  useEffect(() => {
-    let alive = true;
-  
-    API.get<BackendProduct[]>("/products")
-      .then((res) => {
-        const normalized: Product[] = (res.data ?? [])
-          .map(normalize)                       // your existing normalizer
-          .filter((x): x is Product => !!x);    // keep only valid
-        if (alive) setAllProducts(normalized);
-      })
-      .catch((err) => {
-        console.error("Error loading products", err);
-        if (alive) setAllProducts([]);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-  
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   const likedProducts = useMemo(
-    () => allProducts.filter((p) => likedIds.includes(p.id)),
-    [allProducts, likedIds]
+    () => products.filter((p) => likedIds.includes(p.id)),
+    [products, likedIds]
   );
 
   const clearFavorites = () => {
@@ -97,10 +42,22 @@ export default function LikedPage() {
   // no-op handlers to satisfy ProductCard props; you can wire these to your cart/quickview later
   const noopAdd = () => {};
   const noopQuick = () => {};
-  console.log(likedProducts)
+  
+  const {
+    type, setType, setPhone,
+    availablePhones,
+  } = useCatalogFilters();
+  
   return (
     <div className="min-h-screen bg-white">
-      <Header cartCount={cartCount} showBasket={true} setCartOpen={setCartOpen} />
+      <Header
+        cartCount={cartCount}
+        setCartOpen={setCartOpen}
+        setType={setType}
+        availablePhones={availablePhones}
+        setPhone={setPhone}
+        type={type}
+      />
       
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-4">

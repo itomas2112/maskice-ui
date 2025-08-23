@@ -1,10 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Compat, Product } from "@/lib/types";
+import type {BackendProduct, Compat, Product} from "@/lib/types";
+import API from "@/lib/api";
+import {useShop} from "@/contexts/shop";
 
-export function useCatalogFilters(products: Product[]) {
+export function useCatalogFilters() {
   const [model, setModel] = useState<Compat>("iPhone 16");
   const [type, setType] = useState<string | undefined>(undefined);
   const [phone, setPhone] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState<boolean>(true)
+  const [products, setProducts] = useState<Product[]>([]);
+  const { normalize } = useShop()
+  
+  useEffect(() => {
+    API.get<BackendProduct[]>("/products")
+      .then((res) => {
+        const normalized: Product[] = (res.data ?? [])
+          .map(normalize)
+          .filter((x): x is Product => !!x);
+        setProducts(normalized);
+        setLoading(false)
+      })
+      .catch(() => {
+        console.error("Error loading products");
+      });
+  }, []);
 
   // All models present in catalog
   const availableModels = useMemo(() => {
@@ -61,5 +80,6 @@ export function useCatalogFilters(products: Product[]) {
     availableModels,
     availableTypes,
     availablePhones,
+    products, loading
   };
 }

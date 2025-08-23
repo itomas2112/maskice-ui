@@ -56,22 +56,9 @@ function Drawer({
 export default function Page() {
   const { addToCart, quick, setQuick, setCartOpen, normalize } = useShop();
   const cartCount = useCartCount();
-
-  const [products, setProducts] = useState<Product[]>([]);
+  
   const [width, setWidth] = useState<number>(0);
-
-  useEffect(() => {
-    API.get<BackendProduct[]>("/products")
-      .then((res) => {
-        const normalized: Product[] = (res.data ?? [])
-          .map(normalize)
-          .filter((x): x is Product => !!x);
-        setProducts(normalized);
-      })
-      .catch(() => {
-        console.error("Error loading products");
-      });
-  }, []);
+  
 
   useEffect(() => {
     const handleResize = () => setWidth(window.innerWidth);
@@ -95,9 +82,9 @@ export default function Page() {
     availableModels,
     availableTypes,
     availablePhones,
-  } = useCatalogFilters(products);
-  console.log(type)
-  console.log(phone)
+    products
+  } = useCatalogFilters();
+  
   return (
     <div id="top" className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50">
       {/* Zaglavlje */}
