@@ -23,6 +23,25 @@ const ShopContext = createContext<ShopContextType | undefined>(undefined);
 const CART_KEY = "shop.cart.v1";
 const CARTOPEN_KEY = "shop.cartOpen.v1";
 
+// If you add more models later, extend this list.
+const COMPAT_VALUES: readonly Compat[] = ["iPhone 16", "iPhone 16 Pro"] as const;
+
+function isCompat(v: unknown): v is Compat {
+  return typeof v === "string" && (COMPAT_VALUES as readonly string[]).includes(v);
+}
+
+function isCartItemLike(x: unknown): x is CartItem {
+  if (!x || typeof x !== "object") return false;
+  const obj = x as Record<string, unknown>;
+  return (
+    typeof obj.productId === "string" &&
+    typeof obj.color === "string" &&
+    typeof obj.qty === "number" &&
+    obj.qty > 0 &&
+    isCompat(obj.model)
+  );
+}
+
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState<boolean>(false);
@@ -33,19 +52,9 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem(CART_KEY) : null;
       if (raw) {
-        const parsed = JSON.parse(raw) as unknown;
+        const parsed: unknown = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          // minimal validation
-          const sane = parsed.filter(
-            (x) =>
-              x &&
-              typeof x === "object" &&
-              typeof (x as any).productId === "string" &&
-              typeof (x as any).color === "string" &&
-              typeof (x as any).qty === "number" &&
-              (x as any).qty > 0 &&
-              (["iPhone 16", "iPhone 16 Pro"] as const).includes((x as any).model)
-          ) as CartItem[];
+          const sane = parsed.filter(isCartItemLike);
           if (sane.length) setCart(sane);
         }
       }
@@ -65,7 +74,9 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     saveTimeout.current = window.setTimeout(() => {
       try {
         localStorage.setItem(CART_KEY, JSON.stringify(cart));
-      } catch {}
+      } catch {
+        // ignore quota errors
+      }
     }, 120);
     return () => {
       if (saveTimeout.current) window.clearTimeout(saveTimeout.current);
@@ -77,7 +88,9 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     try {
       localStorage.setItem(CARTOPEN_KEY, JSON.stringify(cartOpen));
-    } catch {}
+    } catch {
+      // ignore quota errors
+    }
   }, [cartOpen]);
 
   // --- cross-tab sync (so adding in one tab updates others)
@@ -85,12 +98,21 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     const onStorage = (e: StorageEvent) => {
       if (e.key === CART_KEY && e.newValue) {
         try {
-          const next = JSON.parse(e.newValue);
-          if (Array.isArray(next)) setCart(next as CartItem[]);
-        } catch {}
+          const next: unknown = JSON.parse(e.newValue);
+          if (Array.isArray(next)) {
+            const sane = next.filter(isCartItemLike);
+            setCart(sane);
+          }
+        } catch {
+          // ignore malformed JSON
+        }
       }
       if (e.key === CARTOPEN_KEY && e.newValue) {
-        setCartOpen(e.newValue === "true");
+        try {
+          setCartOpen(JSON.parse(e.newValue) === true);
+        } catch {
+          setCartOpen(e.newValue === "true");
+        }
       }
     };
     window.addEventListener("storage", onStorage);
@@ -98,9 +120,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addToCart = (p: Product, color: string, qty: number = 1, modelOverride?: Compat) => {
+    if (qty <= 0) return;
     const model: Compat = modelOverride ?? p.compat;
     const dbId = p.productIdByColor[color] ?? p.productIdByColor[p.defaultColor];
     if (!dbId) return;
+
     setCart((c) => {
       const idx = c.findIndex((x) => x.productId === dbId && x.model === model && x.color === color);
       if (idx !== -1) {

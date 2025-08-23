@@ -35,15 +35,22 @@ export function Header({ setCartOpen, cartCount, showBasket = true }: HeaderProp
     <header className="sticky top-0 z-40 border-b border-black/5 bg-white/60 backdrop-blur">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
         {/* Wordmark */}
-        <a
+        <Link
           href="/"
-          onClick={goHomeOrTop}
+          prefetch={false}
+          onClick={(e) => {
+            // If we're already on the homepage, just scroll to top smoothly
+            if (pathname === "/") {
+              e.preventDefault();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
           className="flex items-center gap-2 select-none cursor-pointer"
           aria-label="Na vrh stranice"
         >
           <span className="inline-flex h-6 w-6 rounded-full bg-gradient-to-tr from-zinc-900 to-zinc-700 ring-1 ring-black/10 shadow-sm" />
           <span className="font-semibold tracking-tight">maskino</span>
-        </a>
+        </Link>
 
         <div className="flex items-center gap-2">
           {/* ❤️ Favorites link */}
