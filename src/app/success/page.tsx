@@ -86,7 +86,7 @@ function SuccessContent() {
 
           <button
             onClick={() => router.push("/")}
-            className="px-6 py-3 rounded-lg bg-black text-white hover:bg-gray-800 transition"
+            className="px-6 py-3 rounded-lg bg-black text-white hover:bg-gray-800 transition cursor-pointer"
           >
             Natrag u trgovinu
           </button>
