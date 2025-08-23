@@ -1,9 +1,9 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import API from "@/lib/api";
-import { Header } from "@/components/layout/Header"; // ⬅️ import your main header
+import { Header } from "@/components/layout/Header";
 
 export default function SuccessPage() {
   const sp = useSearchParams();
@@ -13,22 +13,31 @@ export default function SuccessPage() {
     "PENDING" | "COMPLETED" | "CANCELED" | "FAILED" | "LOADING"
   >("LOADING");
 
+  // ✅ precise type for setTimeout handle (works in both browser & Node types)
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!orderId) return;
-    let timer: any;
+
     const fetchStatus = async () => {
       try {
         const r = await API.get(`/orders/${orderId}`);
-        setStatus(r.data.status);
+        setStatus(r.data.status as typeof status);
         if (r.data.status === "PENDING") {
-          timer = setTimeout(fetchStatus, 1500);
+          // re-schedule
+          pollRef.current = setTimeout(fetchStatus, 1500);
         }
-      } catch {
+      } catch (e) {
         setStatus("FAILED");
       }
     };
+
     fetchStatus();
-    return () => clearTimeout(timer);
+
+    // ✅ cleanup
+    return () => {
+      if (pollRef.current) clearTimeout(pollRef.current);
+    };
   }, [orderId]);
 
   const niceCode = orderId ? orderId.split("-")[0].toUpperCase() : "—";
