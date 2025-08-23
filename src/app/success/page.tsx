@@ -1,13 +1,13 @@
 "use client";
 
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 import API from "@/lib/api";
 import { Header } from "@/components/layout/Header";
 
 type Status = "PENDING" | "COMPLETED" | "CANCELED" | "FAILED" | "LOADING";
 
-export default function SuccessPage() {
+function SuccessContent() {
   const sp = useSearchParams();
   const router = useRouter();
   const orderId = sp.get("order_id");
@@ -32,20 +32,20 @@ export default function SuccessPage() {
         const s = asStatus(r?.data?.status);
         setStatus(s ?? "FAILED");
         if (s === "PENDING") {
-          // re-schedule polling
           pollRef.current = setTimeout(fetchStatus, 1500);
         }
       } catch {
-        // no unused var warning
         setStatus("FAILED");
       }
     };
 
     fetchStatus();
 
-    // cleanup timer on unmount or orderId change
     return () => {
-      if (pollRef.current) clearTimeout(pollRef.current);
+      if (pollRef.current) {
+        clearTimeout(pollRef.current);
+        pollRef.current = null;
+      }
     };
   }, [orderId]);
 
@@ -76,5 +76,13 @@ export default function SuccessPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={<main className="max-w-2xl mx-auto p-6">Učitavanje…</main>}>
+      <SuccessContent />
+    </Suspense>
   );
 }
