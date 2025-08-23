@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import API from "@/lib/api";
 import { Header } from "@/components/layout/Header";
-import { useShop } from "@/contexts/shop"; // <-- add
+import {useCartCount, useShop} from "@/contexts/shop";
+import {useCatalogFilters} from "@/hooks/useCatalogFilters"; // <-- add
 
 type Status = "PENDING" | "COMPLETED" | "CANCELED" | "FAILED" | "LOADING";
 
@@ -65,12 +66,26 @@ function SuccessContent() {
       }
     };
   }, [orderId]);
+  
+    const {
+      type, setType, setPhone,
+      availablePhones
+    } = useCatalogFilters();
+    
+    const cartCount = useCartCount();
 
   const niceCode = orderId ? orderId.split("-")[0].toUpperCase() : "—";
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <Header showBasket={false} cartCount={0} /> {/* basket hidden here */}
+      <Header
+        cartCount={cartCount}
+        setCartOpen={setCartOpen}
+        setType={setType}
+        availablePhones={availablePhones}
+        setPhone={setPhone}
+        type={type}
+      />
 
       <main className="flex-1 flex items-center justify-center px-6">
         <div className="max-w-xl w-full bg-white shadow-lg rounded-xl p-8 text-center">
