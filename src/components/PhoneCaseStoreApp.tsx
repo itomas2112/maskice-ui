@@ -16,20 +16,25 @@ const BASE_PRICE = 3.0;
 
 // Katalog — mali i fokusiran
 type BackendProduct = {
-  id: string;
+  id: string;                // UI slug from backend (keep for grouping)
   name: string;
-  compat: string; // backend sends a single model string
+  compat: string;
   price_cents: number;
-  variants: { colors: string; image: string }[];
+  variants: {                // each color variant now carries the DB id
+    product_id: string;      // <-- NEW
+    colors: string;
+    image: string;
+  }[];
 };
 
 type Product = {
-  id: string;
+  id: string; // keep backend group id for UI
   name: string;
-  compat: Compat;                 // single model
+  compat: Compat;
   price_cents: number;
   colors: string[];
-  imageByColor: Record<string, string>; // color -> image
+  imageByColor: Record<string, string>;
+  productIdByColor: Record<string, string>; // <-- NEW: color -> DB product_id
   defaultColor: string;
 };
 
@@ -74,26 +79,30 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 const fixPublicPath = (p: string) => p.replace(/^\/public(\/|$)/, "/");
 
 const normalize = (bp: BackendProduct): Product | null => {
-  // guard for unknown models (keeps type safety while allowing backend to grow)
   const compat = bp.compat as Compat;
   if (!["iPhone 16", "iPhone 16 Pro"].includes(bp.compat)) return null;
 
   const imageByColor: Record<string, string> = {};
+  const productIdByColor: Record<string, string> = {};
   const colors: string[] = [];
+
   for (const v of bp.variants ?? []) {
     const img = fixPublicPath(v.image);
     imageByColor[v.colors] = img;
+    productIdByColor[v.colors] = String(v.product_id); // normalize to string
     colors.push(v.colors);
   }
+
   const defaultColor = colors[0] ?? "Default";
 
   return {
-    id: bp.id,
+    id: bp.id, // keep group id; NOT the DB id
     name: bp.name,
     compat,
     price_cents: bp.price_cents,
     colors,
     imageByColor,
+    productIdByColor, // <-- NEW
     defaultColor,
   };
 };
@@ -286,6 +295,9 @@ export default function Page() {
     () => products.filter((p) => p.compat === catalogModel),
     [products, catalogModel]
   );
+  
+  const productByVariant = (dbId: string, color: string) =>
+    products.find((p) => p.productIdByColor[color] === dbId);
 
   const formOk =
     customer.first_name.trim() &&
@@ -295,18 +307,21 @@ export default function Page() {
     customer.city.trim() &&
     customer.postal_code.trim() &&
     customer.country.trim();
-
+  
   const addToCart = (p: Product, color: string, qty: number = 1) =>
     setCart((c) => {
+      const dbId = p.productIdByColor[color] ?? p.productIdByColor[p.defaultColor];
+      if (!dbId) return c; // safety guard
+  
       const idx = c.findIndex(
-        (x) => x.productId === p.id && x.model === catalogModel && x.color === color
+        (x) => x.productId === dbId && x.model === catalogModel && x.color === color
       );
       if (idx !== -1) {
         const next = [...c];
-        next[idx] = { ...next[idx], qty: next[idx].qty + qty }; // 🔑 add exactly selected qty
+        next[idx] = { ...next[idx], qty: next[idx].qty + qty };
         return next;
       }
-      return [...c, { model: catalogModel, color, qty, productId: p.id }]; // 🔑 start with selected qty
+      return [...c, { model: catalogModel, color, qty, productId: dbId }];
     });
 
   const keyOf = (x: {
@@ -351,6 +366,7 @@ export default function Page() {
   useEffect(() => {
     API.get("/products")
       .then((res) => {
+        console.log(res.data)
         const normalized: Product[] = (res.data as BackendProduct[])
           .map(normalize)
           .filter((x): x is Product => !!x);
@@ -606,7 +622,7 @@ export default function Page() {
         <div className="space-y-3">
           {cart.length === 0 && <p className="text-sm text-gray-600">Vaša košarica je prazna.</p>}
           {cart.map((it) => {
-            const p = productById(it.productId);
+            const p = productByVariant(it.productId, it.color);
             const itemKey = keyOf(it);
           
             // Gracefully handle missing/removed product
