@@ -6,34 +6,10 @@ import { Button } from "@/components/ui/button";
 import { useShop } from "@/contexts/shop";
 import API from "@/lib/api";
 import type { BackendProduct, Product, Compat } from "@/lib/types";
+import {useCatalogFilters} from "@/hooks/useCatalogFilters";
 
 const EUR = (n: number) =>
   new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(n);
-
-const fixPublicPath = (p: string) => p.replace(/^\/public(\/|$)/, "/");
-
-const normalize = (bp: BackendProduct): Product | null => {
-  const compat = bp.compat as Compat;
-  if (!["iPhone 16", "iPhone 16 Pro"].includes(bp.compat)) return null;
-  const imageByColor: Record<string, string> = {};
-  const productIdByColor: Record<string, string> = {};
-  const colors: string[] = [];
-  for (const v of bp.variants ?? []) {
-    imageByColor[v.colors] = fixPublicPath(v.image);
-    productIdByColor[v.colors] = String(v.product_id);
-    colors.push(v.colors);
-  }
-  return {
-    id: bp.id,
-    name: bp.name,
-    compat,
-    price_cents: bp.price_cents,
-    colors,
-    imageByColor,
-    productIdByColor,
-    defaultColor: colors[0] ?? "Default",
-  };
-};
 
 type Customer = {
   first_name: string;
@@ -52,12 +28,7 @@ export default function CartDrawer() {
   const { cartOpen, setCartOpen, cart, setCart } = useShop();
 
   // Load catalog so we can render names/images/prices regardless of route
-  const [products, setProducts] = useState<Product[]>([]);
-  useEffect(() => {
-    API.get<BackendProduct[]>("/products")
-      .then((res) => setProducts((res.data ?? []).map(normalize).filter((x): x is Product => !!x)))
-      .catch(() => setProducts([]));
-  }, []);
+  const { products } = useCatalogFilters()
 
   // Customer form state (persist to localStorage)
   const [customer, setCustomer] = useState<Customer>({
