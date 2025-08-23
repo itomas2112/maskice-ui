@@ -362,51 +362,61 @@ export default function Page() {
   }, []);
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return;
+  if (cart.length === 0) return;
 
-    if (!formOk) {
-      alert("Molimo ispunite podatke za dostavu (ime, prezime, email, adresu).");
-      return;
-    }
+  if (!formOk) {
+    alert("Molimo ispunite podatke za dostavu (ime, prezime, email, adresu).");
+    return;
+  }
 
-    try {
-      setCreating(true);
+  try {
+    setCreating(true);
 
-      const items = cart.map((it) => ({
-        product_id: it.productId,
-        qty: it.qty,
-        color: it.color,
-        model: it.model, // must be exactly "iPhone 16" or "iPhone 16 Pro"
-      }));
+    const items = cart.map((it) => ({
+      product_id: it.productId,
+      qty: it.qty,
+      color: it.color,
+      model: it.model, // must be exactly "iPhone 16" or "iPhone 16 Pro"
+    }));
 
-      // 🔧 map flat fields -> nested address expected by backend
-      const payload = {
-        items,
-        customer: {
-          first_name: customer.first_name,
-          last_name: customer.last_name,
-          email: customer.email,
-          address: {
-            line1: customer.address_line1,
-            line2: customer.address_line2 || null,
-            city: customer.city,
-            postal_code: customer.postal_code,
-            country: customer.country, // e.g. "HR"
-          },
+    const payload = {
+      items,
+      customer: {
+        first_name: customer.first_name,
+        last_name: customer.last_name,
+        email: customer.email,
+        address: {
+          line1: customer.address_line1,
+          line2: customer.address_line2 || null,
+          city: customer.city,
+          postal_code: customer.postal_code,
+          country: customer.country,
         },
-      };
+      },
+    };
 
-      const res = await API.post<CheckoutSessionResp>("/checkout/session", payload);
-      window.location.href = res.data.checkout_url;
-    } catch (err: any) {
-      // show exact FastAPI validation errors to debug quickly
-      const detail = err?.response?.data?.detail ?? err.message;
-      console.error("Error starting checkout", err);
-      alert(`Greška pri pokretanju plaćanja:\n${JSON.stringify(detail, null, 2)}`);
-    } finally {
-      setCreating(false);
+    const res = await API.post<CheckoutSessionResp>("/checkout/session", payload);
+    window.location.href = res.data.checkout_url;
+  } catch (err: unknown) {
+    // narrow 'unknown' to extract a useful message without using 'any'
+    let detail = "Unknown error";
+    if (err instanceof Error) {
+      detail = err.message;
+    } else if (typeof err === "object" && err && "response" in err) {
+      const resp = (err as { response?: { data?: { detail?: unknown } } }).response;
+      if (resp?.data?.detail !== undefined) {
+        detail =
+          typeof resp.data.detail === "string"
+            ? resp.data.detail
+            : JSON.stringify(resp.data.detail, null, 2);
+      }
     }
-  };
+    console.error("Error starting checkout", err);
+    alert(`Greška pri pokretanju plaćanja:\n${detail}`);
+  } finally {
+    setCreating(false);
+  }
+};
 
   useEffect(() => {
     const handleResize = () => setWidth(window.innerWidth);
