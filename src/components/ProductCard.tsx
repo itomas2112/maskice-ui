@@ -1,7 +1,6 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useMemo, useState} from "react";
 import {Check, Heart} from "lucide-react";
 import {Button} from "@/components/ui/button";
-
 import { Product, Compat } from "@/lib/types";
 
 const EUR = (n: number) =>
@@ -13,7 +12,7 @@ export function ProductCard({
   onAdd,
   onQuickView,
 }: {
-  product: Product;
+  product: Product & { quantityByColor?: Record<string, number> }; // NEW: allow runtime stock map
   model: Compat;
   onAdd: (p: Product, color: string, qty: number) => void;
   onQuickView: (p: Product, color: string, qty: number) => void;
@@ -21,8 +20,6 @@ export function ProductCard({
   const [cardColor, setCardColor] = useState<string>(product.defaultColor);
   const [quantity, setQuantity] = useState<number>(1);
   const [added, setAdded] = useState<boolean>(false);
-
-  // ❤️ liked state
   const [liked, setLiked] = useState<boolean>(false);
 
   const price = product.price_cents / 100;
@@ -30,19 +27,29 @@ export function ProductCard({
     product.imageByColor[cardColor] ??
     product.imageByColor[product.defaultColor];
 
+  // --- STOCK HELPERS ----------------------------------------------------- //
+  const stockLeft = product.quantityByColor?.[cardColor] ?? 0;                   // NEW
+  const maxSelectable = Math.max(0, Math.min(10, stockLeft));                    // NEW (cap at 10)
+  const qtyOptions = useMemo(                                                     // NEW
+    () => Array.from({ length: maxSelectable }, (_, i) => i + 1),
+    [maxSelectable]
+  );
+
+  // If user switches to a color with less stock, clamp the selected qty       // NEW
+  useEffect(() => {
+    if (quantity > maxSelectable) setQuantity(Math.max(1, maxSelectable));
+  }, [maxSelectable, quantity]);
+
   // Load liked state from localStorage
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("likedProducts") || "[]");
-    if (stored.includes(product.id)) {
-      setLiked(true);
-    }
+    if (stored.includes(product.id)) setLiked(true);
   }, [product.id]);
 
   const toggleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
     const stored = JSON.parse(localStorage.getItem("likedProducts") || "[]");
     let updated: string[];
-
     if (liked) {
       updated = stored.filter((id: string) => id !== product.id);
       setLiked(false);
@@ -55,13 +62,18 @@ export function ProductCard({
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onAdd(product, cardColor, quantity);
+
+    // Clamp requested qty against stock (defensive)                          // NEW
+    const safeQty = Math.min(quantity, maxSelectable);
+    if (safeQty <= 0) return;
+
+    onAdd(product, cardColor, safeQty);
     setAdded(true);
     setTimeout(() => setAdded(false), 900);
   };
 
   const handleQuickView = () => onQuickView(product, cardColor, quantity);
-  
+
   return (
     <div
       className="
@@ -94,6 +106,11 @@ export function ProductCard({
             }`}
           />
         </button>
+
+        {/* Stock badge (optional, but useful) */}                               {/* NEW */}
+        <div className="absolute left-2 top-2 text-xs px-2 py-1 rounded bg-white/80 border">
+          Na stanju: <span className="font-semibold">{stockLeft}</span>
+        </div>
       </div>
 
       {/* Content area */}
@@ -114,6 +131,7 @@ export function ProductCard({
             Boja &amp; Količina
           </label>
           <div className="flex gap-2 sm:flex-row flex-col">
+            {/* Color select: disable out-of-stock colors */}                    {/* NEW */}
             <select
               value={cardColor}
               onChange={(e) => setCardColor(e.target.value)}
@@ -121,25 +139,33 @@ export function ProductCard({
               onClick={(e) => e.stopPropagation()}
               aria-label="Odaberi boju"
             >
-              {product.colors.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              {product.colors.map((c) => {
+                const left = product.quantityByColor?.[c] ?? 0;
+                const soldOut = left <= 0;
+                return (
+                  <option key={c} value={c} disabled={soldOut}>
+                    {c} {soldOut ? "— rasprodano" : ""}
+                  </option>
+                );
+              })}
             </select>
 
+            {/* Quantity select capped by stock (and 10) */}                    {/* NEW */}
             <select
-              value={quantity}
+              value={Math.min(quantity, maxSelectable)}
               onChange={(e) => setQuantity(Number(e.target.value))}
               className="w-full sm:w-24 px-3 py-2 rounded-lg border cursor-pointer"
               onClick={(e) => e.stopPropagation()}
               aria-label="Odaberi količinu"
+              disabled={maxSelectable === 0}
             >
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
+              {qtyOptions.length > 0 ? (
+                qtyOptions.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))
+              ) : (
+                <option value={0}>0</option>
+              )}
             </select>
           </div>
         </div>
@@ -151,15 +177,15 @@ export function ProductCard({
               added ? "bg-gray-300 text-gray-700" : ""
             }`}
             onClick={handleAdd}
-            disabled={added || quantity < 1}
+            disabled={added || maxSelectable <= 0}                             // NEW
           >
-            {added ? (
-              <span className="flex items-center justify-center gap-1">
-                <Check className="w-4 h-4" /> Dodano
-              </span>
-            ) : (
-              "Dodaj"
-            )}
+            {maxSelectable <= 0
+              ? "Nema na zalihi"                                              // NEW
+              : added
+                ? <span className="flex items-center justify-center gap-1">
+                    <Check className="w-4 h-4" /> Dodano
+                  </span>
+                : "Dodaj"}
           </Button>
         </div>
       </div>

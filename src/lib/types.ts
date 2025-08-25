@@ -20,7 +20,7 @@ export type BackendProduct = {
   price_cents: number;
   type: string;
   phone: string;
-  variants: { product_id: string; colors: string; image: string }[];
+  variants: { product_id: string; colors: string; image: string, quantity: number }[];
 };
 
 export type CartItem = {

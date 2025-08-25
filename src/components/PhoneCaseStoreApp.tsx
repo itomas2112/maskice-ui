@@ -3,11 +3,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import API from "@/lib/api";
 import { Header } from "@/components/layout/Header";
 import { ProductCard } from "@/components/ProductCard";
 import { useShop, useCartCount } from "@/contexts/shop";
-import type { Compat, Product, BackendProduct } from "@/lib/types";
+import type { Compat, Product } from "@/lib/types";
 import { useCatalogFilters } from "@/hooks/useCatalogFilters";
 
 const EUR = (n: number) =>
@@ -54,26 +53,23 @@ function Drawer({
 }
 
 export default function Page() {
-  const { addToCart, quick, setQuick, setCartOpen, normalize } = useShop();
+  const { addToCart, quick, setQuick, setCartOpen, cart, setCart } = useShop();
   const cartCount = useCartCount();
-  
-  const [width, setWidth] = useState<number>(0);
-  
 
+  const [width, setWidth] = useState<number>(0);
   useEffect(() => {
     const handleResize = () => setWidth(window.innerWidth);
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
   const isMobile = width < 980;
 
   const goTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  
+
   const {
     model, setModel,
     type, setType,
@@ -84,7 +80,101 @@ export default function Page() {
     availablePhones,
     products
   } = useCatalogFilters();
-  
+
+  /**
+   * Reverse indices for fast lookups:
+   * - byGroupId: Product by catalog group product.id (already used)
+   * - byVariantId: Product by variant (DB) id, so we can resolve cart lines that store `productId`
+   * - variantDefaultColor: default color per variant id (fallback if cart color missing)
+   */
+  const { byGroupId, byVariantId, variantDefaultColor } = useMemo(() => {
+    const _byGroup: Record<string, Product & { quantityByColor?: Record<string, number> }> = {};
+    const _byVar: Record<string, Product & { quantityByColor?: Record<string, number> }> = {};
+    const _varDefault: Record<string, string> = {};
+    for (const p of products as (Product & { quantityByColor?: Record<string, number> })[]) {
+      _byGroup[p.id] = p;
+      for (const c of p.colors) {
+        const vid = p.productIdByColor[c];
+        if (vid) {
+          _byVar[vid] = p;
+          _varDefault[vid] = p.defaultColor ?? c;
+        }
+      }
+    }
+    return { byGroupId: _byGroup, byVariantId: _byVar, variantDefaultColor: _varDefault };
+  }, [products]);
+
+  // ===== Cart sanitizer that *only* removes/clamps when real stock info exists =====
+  useEffect(() => {
+    if (!Array.isArray(cart) || !products?.length) return;
+
+    let changed = false;
+
+    const next = (cart as any[]).flatMap((line) => {
+      if (!line) { changed = true; return []; }
+
+      // Ensure we can resolve the product from either the bundled `product` or the variant id we store as `productId`
+      let product: (Product & { quantityByColor?: Record<string, number> }) | undefined =
+        line.product && (line.product as any).id ? byGroupId[(line.product as any).id] : undefined;
+
+      if (!product && typeof line.productId === "string") {
+        product = byVariantId[line.productId];
+      }
+      if (!product && line.id) {
+        product = byGroupId[line.id];
+      }
+
+      // normalize color if missing
+      let color: string | undefined = line.color;
+      if (!color && line.productId && variantDefaultColor[line.productId]) {
+        color = variantDefaultColor[line.productId];
+        line = { ...line, color };
+        changed = true;
+      }
+
+      if (!product || !color || typeof line.qty !== "number") {
+        // Cannot resolve yet — keep the line as-is (don’t nuke the cart!)
+        return [line];
+      }
+
+      // Attach product for downstream UI (optional)
+      if (!line.product) {
+        line = { ...line, product };
+        changed = true;
+      }
+
+      // Stock logic
+      const hasStockInfo =
+        product.quantityByColor && Object.keys(product.quantityByColor).length > 0;
+
+      // When stock unknown, don't remove; cap softly at 10 to avoid silly values
+      const rawLeft = hasStockInfo ? (product.quantityByColor![color] ?? 0) : 10;
+      const left = Math.max(0, Math.min(10, rawLeft));
+
+      if (hasStockInfo) {
+        if (left <= 0) { changed = true; return []; }
+        if (line.qty > left) { changed = true; return [{ ...line, qty: left }]; }
+      }
+
+      return [line];
+    });
+
+    if (changed) setCart(next as typeof cart);
+  }, [products, cart, setCart, byGroupId, byVariantId, variantDefaultColor]);
+
+  const getMaxQty = (p: Product & { quantityByColor?: Record<string, number> }, color: string) => {
+    const hasStockInfo = p.quantityByColor && Object.keys(p.quantityByColor).length > 0;
+    const rawLeft = hasStockInfo ? (p.quantityByColor?.[color] ?? 0) : 10; // default limit when unknown
+    return Math.max(0, Math.min(10, rawLeft));
+  };
+
+  const safeAdd = (prod: Product & { quantityByColor?: Record<string, number> }, color: string, wanted = 1) => {
+    const max = getMaxQty(prod, color);
+    const qty = Math.min(wanted, max);
+    if (qty <= 0) return;
+    addToCart(prod, color, qty);
+  };
+
   return (
     <div id="top" className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50">
       {/* Zaglavlje */}
@@ -155,7 +245,7 @@ export default function Page() {
                 <ProductCard
                   product={p}
                   model={model}
-                  onAdd={(prod, color, qty) => addToCart(prod, color, qty)}
+                  onAdd={(prod, color, qty = 1) => safeAdd(prod as any, color, qty)}
                   onQuickView={(prod, color) => setQuick({ product: prod, color })}
                 />
               </div>
@@ -230,9 +320,10 @@ export default function Page() {
             <div className="flex gap-2">
               <Button
                 onClick={() => {
-                  addToCart(quick.product, quick.color);
+                  // Use safeAdd here too to honor stock logic
+                  safeAdd(quick.product as any, quick.color, 1);
                   setQuick(null);
-                  setCartOpen(true); // open cart after adding from Quick View
+                  setCartOpen(true);
                 }}
               >
                 Dodaj u košaricu • {EUR(BASE_PRICE)}
