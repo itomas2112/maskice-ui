@@ -5,13 +5,31 @@ import API from "@/lib/api";
 import { useShop } from "@/contexts/shop";
 
 type QuantityByColor = Record<string, number>;
+type ProductWithStock = Product & { quantityByColor: QuantityByColor };
+
+// ——— helpers without using `any`
+function getStringFromKeys(obj: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "string" && v.trim().length > 0) return v;
+  }
+  return undefined;
+}
+function getNumberLikeFromKeys(obj: Record<string, unknown>, keys: string[], fallback = 0): number {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  }
+  return fallback;
+}
 
 export function useCatalogFilters() {
   const [model, setModel] = useState<Compat>("iPhone 16");
   const [type, setType] = useState<string | undefined>(undefined);
   const [phone, setPhone] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState<boolean>(true);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductWithStock[]>([]);
   const { normalize } = useShop();
 
   useEffect(() => {
@@ -19,38 +37,29 @@ export function useCatalogFilters() {
       .then((res) => {
         const rows = res.data ?? [];
 
-        const normalized: Product[] = rows
+        const normalized: ProductWithStock[] = rows
           .map((row) => {
             const base = normalize(row);
             if (!base) return null;
 
             const quantityByColor: QuantityByColor = {};
-            for (const v of row.variants ?? []) {
+
+            const variants = (row as unknown as { variants?: unknown[] }).variants ?? [];
+            for (const vv of variants) {
+              if (typeof vv !== "object" || vv === null) continue;
+              const v = vv as Record<string, unknown>;
+
               // Be lenient with backend field names: colors/color & quantity/qty
-              const colorKey =
-                (v as any).colors ??
-                (v as any).color ??
-                (v as any).colour ??
-                (v as any).Color ??
-                undefined;
+              const colorKey = getStringFromKeys(v, ["colors", "color", "colour", "Color"]);
               if (!colorKey) continue;
 
-              const qRaw =
-                (v as any).quantity ??
-                (v as any).qty ??
-                (v as any).stok ??
-                (v as any).Quantity ??
-                0;
-              const q = Number.isFinite(Number(qRaw)) ? Number(qRaw) : 0;
-
+              const q = getNumberLikeFromKeys(v, ["quantity", "qty", "stok", "Quantity"], 0);
               quantityByColor[colorKey] = q;
             }
 
-            return { ...base, quantityByColor } as Product & {
-              quantityByColor: QuantityByColor;
-            };
+            return { ...(base as Product), quantityByColor };
           })
-          .filter((x): x is Product & { quantityByColor: QuantityByColor } => !!x);
+          .filter((x): x is ProductWithStock => !!x);
 
         setProducts(normalized);
         setLoading(false);

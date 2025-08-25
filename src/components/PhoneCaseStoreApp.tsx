@@ -52,6 +52,24 @@ function Drawer({
   );
 }
 
+// Local structural types (no `any`)
+type QuantityByColor = Record<string, number>;
+type ProductWithStock = Product & { quantityByColor?: QuantityByColor };
+
+type CartLine = {
+  id?: string;                 // catalog group id (optional)
+  productId?: string;          // DB variant id
+  product?: ProductWithStock | { id?: string } | null;
+  color?: string;
+  qty: number;
+  // allow extra unknown data from context without using `any`
+  [key: string]: unknown;
+};
+
+function isObject(x: unknown): x is Record<string, unknown> {
+  return typeof x === "object" && x !== null;
+}
+
 export default function Page() {
   const { addToCart, quick, setQuick, setCartOpen, cart, setCart } = useShop();
   const cartCount = useCartCount();
@@ -88,10 +106,10 @@ export default function Page() {
    * - variantDefaultColor: default color per variant id (fallback if cart color missing)
    */
   const { byGroupId, byVariantId, variantDefaultColor } = useMemo(() => {
-    const _byGroup: Record<string, Product & { quantityByColor?: Record<string, number> }> = {};
-    const _byVar: Record<string, Product & { quantityByColor?: Record<string, number> }> = {};
+    const _byGroup: Record<string, ProductWithStock> = {};
+    const _byVar: Record<string, ProductWithStock> = {};
     const _varDefault: Record<string, string> = {};
-    for (const p of products as (Product & { quantityByColor?: Record<string, number> })[]) {
+    for (const p of products as ProductWithStock[]) {
       _byGroup[p.id] = p;
       for (const c of p.colors) {
         const vid = p.productIdByColor[c];
@@ -110,26 +128,32 @@ export default function Page() {
 
     let changed = false;
 
-    const next = (cart as any[]).flatMap((line) => {
-      if (!line) { changed = true; return []; }
+    const next = (cart as unknown[]).flatMap((raw) => {
+      if (!isObject(raw)) { changed = true; return []; }
+      const line = raw as CartLine;
 
       // Ensure we can resolve the product from either the bundled `product` or the variant id we store as `productId`
-      let product: (Product & { quantityByColor?: Record<string, number> }) | undefined =
-        line.product && (line.product as any).id ? byGroupId[(line.product as any).id] : undefined;
+      let product: ProductWithStock | undefined;
+
+      if (line.product && isObject(line.product) && typeof (line.product as { id?: string }).id === "string") {
+        const pid = (line.product as { id?: string }).id;
+        if (pid) product = byGroupId[pid];
+      }
 
       if (!product && typeof line.productId === "string") {
         product = byVariantId[line.productId];
       }
-      if (!product && line.id) {
+
+      if (!product && typeof line.id === "string") {
         product = byGroupId[line.id];
       }
 
       // normalize color if missing
-      let color: string | undefined = line.color;
+      let color: string | undefined = typeof line.color === "string" ? line.color : undefined;
       if (!color && line.productId && variantDefaultColor[line.productId]) {
         color = variantDefaultColor[line.productId];
-        line = { ...line, color };
         changed = true;
+        return [{ ...line, color }];
       }
 
       if (!product || !color || typeof line.qty !== "number") {
@@ -138,10 +162,8 @@ export default function Page() {
       }
 
       // Attach product for downstream UI (optional)
-      if (!line.product) {
-        line = { ...line, product };
-        changed = true;
-      }
+      const lineWithProduct = line.product ? line : { ...line, product };
+      if (!line.product) changed = true;
 
       // Stock logic
       const hasStockInfo =
@@ -153,22 +175,22 @@ export default function Page() {
 
       if (hasStockInfo) {
         if (left <= 0) { changed = true; return []; }
-        if (line.qty > left) { changed = true; return [{ ...line, qty: left }]; }
+        if (lineWithProduct.qty > left) { changed = true; return [{ ...lineWithProduct, qty: left }]; }
       }
 
-      return [line];
+      return [lineWithProduct];
     });
 
     if (changed) setCart(next as typeof cart);
   }, [products, cart, setCart, byGroupId, byVariantId, variantDefaultColor]);
 
-  const getMaxQty = (p: Product & { quantityByColor?: Record<string, number> }, color: string) => {
+  const getMaxQty = (p: ProductWithStock, color: string) => {
     const hasStockInfo = p.quantityByColor && Object.keys(p.quantityByColor).length > 0;
     const rawLeft = hasStockInfo ? (p.quantityByColor?.[color] ?? 0) : 10; // default limit when unknown
     return Math.max(0, Math.min(10, rawLeft));
   };
 
-  const safeAdd = (prod: Product & { quantityByColor?: Record<string, number> }, color: string, wanted = 1) => {
+  const safeAdd = (prod: ProductWithStock, color: string, wanted = 1) => {
     const max = getMaxQty(prod, color);
     const qty = Math.min(wanted, max);
     if (qty <= 0) return;
@@ -245,7 +267,7 @@ export default function Page() {
                 <ProductCard
                   product={p}
                   model={model}
-                  onAdd={(prod, color, qty = 1) => safeAdd(prod as any, color, qty)}
+                  onAdd={(prod, color, qty = 1) => safeAdd(prod as ProductWithStock, color, qty)}
                   onQuickView={(prod, color) => setQuick({ product: prod, color })}
                 />
               </div>
@@ -321,7 +343,7 @@ export default function Page() {
               <Button
                 onClick={() => {
                   // Use safeAdd here too to honor stock logic
-                  safeAdd(quick.product as any, quick.color, 1);
+                  safeAdd(quick.product as ProductWithStock, quick.color, 1);
                   setQuick(null);
                   setCartOpen(true);
                 }}
