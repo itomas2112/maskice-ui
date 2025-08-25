@@ -1,7 +1,6 @@
-// src/components/CartDrawer.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useShop } from "@/contexts/shop";
 import API from "@/lib/api";
@@ -58,17 +57,10 @@ export default function CartDrawer() {
     } catch {}
   }, [customer]);
 
-  const formOk =
-    customer.first_name.trim() &&
-    customer.last_name.trim() &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email) &&
-    customer.address_line1.trim() &&
-    customer.city.trim() &&
-    customer.postal_code.trim() &&
-    customer.country.trim();
-
-  const productByVariant = (dbId: string, color: string) =>
-    products.find((p) => p.productIdByColor[color] === dbId);
+  const productByVariant = useCallback(
+    (dbId: string, color: string) => products.find((p) => p.productIdByColor[color] === dbId),
+    [products]
+  );
 
   const keyOf = (x: { productId: string; model: Compat; color: string }) =>
     `${x.productId}-${x.model}-${x.color}`;
@@ -79,7 +71,7 @@ export default function CartDrawer() {
         const p = productByVariant(it.productId, it.color);
         return p ? s + (p.price_cents / 100) * it.qty : s;
       }, 0),
-    [cart, products]
+    [cart, productByVariant]
   );
 
   const shipping = subtotal >= 25 || subtotal === 0 ? 0 : 2.0;
@@ -89,7 +81,17 @@ export default function CartDrawer() {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
-    if (!formOk) {
+    if (
+      !(
+        customer.first_name.trim() &&
+        customer.last_name.trim() &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email) &&
+        customer.address_line1.trim() &&
+        customer.city.trim() &&
+        customer.postal_code.trim() &&
+        customer.country.trim()
+      )
+    ) {
       alert("Molimo ispunite podatke za dostavu (ime, prezime, email, adresu).");
       return;
     }
@@ -140,6 +142,15 @@ export default function CartDrawer() {
       setCreating(false);
     }
   };
+
+  const formOk =
+    customer.first_name.trim() &&
+    customer.last_name.trim() &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email) &&
+    customer.address_line1.trim() &&
+    customer.city.trim() &&
+    customer.postal_code.trim() &&
+    customer.country.trim();
 
   return (
     <div className={`fixed inset-0 z-50 ${cartOpen ? "pointer-events-auto" : "pointer-events-none"}`}>
@@ -263,7 +274,7 @@ export default function CartDrawer() {
             </div>
           </div>
 
-          {/* Podaci za dostavu */}
+          {/* Shipping form */}
           {cart.length > 0 && (
             <div className="mt-3 space-y-3 border rounded-lg p-3 bg-white">
               <div className="font-medium">Podaci za dostavu</div>
@@ -331,7 +342,6 @@ export default function CartDrawer() {
             </div>
           )}
 
-          {/* Pay button */}
           <Button
             className="w-full mt-3 cursor-pointer"
             disabled={cart.length === 0 || creating || !formOk}

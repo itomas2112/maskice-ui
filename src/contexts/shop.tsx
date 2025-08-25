@@ -1,16 +1,22 @@
-// src/contexts/shop.tsx
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { Compat, Product, BackendProduct, CartItem, QuickState } from "@/lib/types";
+import type {
+  Compat,
+  Product,
+  BackendProduct,
+  CartItem,
+  ProductWithStock,
+  QuickState, // if you kept this in types, remove this import
+} from "@/lib/types";
 
 type ShopContextType = {
   cart: CartItem[];
   setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
   cartOpen: boolean;
   setCartOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  quick: QuickState;
-  setQuick: React.Dispatch<React.SetStateAction<QuickState>>;
+  quick: { product: ProductWithStock; color: string } | null;
+  setQuick: React.Dispatch<React.SetStateAction<{ product: ProductWithStock; color: string } | null>>;
   addToCart: (p: Product, color: string, qty?: number, modelOverride?: Compat) => void;
   normalize: (bp: BackendProduct) => Product | null;
 };
@@ -75,7 +81,7 @@ const normalize = (bp: BackendProduct): Product | null => {
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState<boolean>(false);
-  const [quick, setQuick] = useState<QuickState>(null);
+  const [quick, setQuick] = useState<{ product: ProductWithStock; color: string } | null>(null);
 
   // hydrate from localStorage
   useEffect(() => {

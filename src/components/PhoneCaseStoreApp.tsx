@@ -1,8 +1,7 @@
-// src/app/page.tsx
+// src/components/PhoneCaseStoreApp.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/Header";
 import { ProductCard } from "@/components/ProductCard";
 import { useShop, useCartCount } from "@/contexts/shop";
@@ -139,7 +138,7 @@ export default function PhoneCaseStoreApp() {
 
   return (
     <div id="top" className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50">
-      {/* Zaglavlje */}
+      {/* Header */}
       <Header
         cartCount={cartCount}
         setCartOpen={setCartOpen}
@@ -179,7 +178,7 @@ export default function PhoneCaseStoreApp() {
           </div>
         </section>
 
-        {/* Katalog */}
+        {/* Catalog */}
         <section id="catalog" className="space-y-4 scroll-mt-24 md:scroll-mt-28">
           <SectionTitle>Istraži ponudu</SectionTitle>
           <div className="grid sm:grid-cols-3 gap-4 items-end">
@@ -251,10 +250,10 @@ export default function PhoneCaseStoreApp() {
         </div>
       </footer>
 
-      {/* Brzi pregled — model zaključan na odabrani */}
+      {/* Brzi pregled — no 'any' casts needed */}
       <Drawer
-        quick={quick as any}   // context QuickState uses Product; Drawer expects ProductWithStock locally
-        setQuick={setQuick as any}
+        quick={quick}
+        setQuick={setQuick}
         model={model}
         safeAdd={safeAdd}
         setCartOpen={setCartOpen}

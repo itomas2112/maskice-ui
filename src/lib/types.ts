@@ -9,15 +9,15 @@ export type Product = {
   imageByColor: Record<string, string>;
   productIdByColor: Record<string, string>;
   defaultColor: string;
-  type: string;   // ← kept
-  phone: string;  // ← kept
+  type: string;   // kept
+  phone: string;  // kept
 };
 
 /** Per-color stock map */
 export type QuantityByColor = Record<string, number>;
 
-/** Product with optional stock info (frontend-enriched) */
-export type ProductWithStock = Product & { quantityByColor?: QuantityByColor };
+/** Product with stock info (frontend-enriched) */
+export type ProductWithStock = Product & { quantityByColor: QuantityByColor };
 
 export type BackendProduct = {
   id: string;
@@ -36,4 +36,4 @@ export type CartItem = {
   productId: string;
 };
 
-export type QuickState = { product: Product; color: string } | null;
+export type QuickState = { product: ProductWithStock; color: string } | null;
