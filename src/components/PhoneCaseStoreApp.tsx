@@ -6,71 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/Header";
 import { ProductCard } from "@/components/ProductCard";
 import { useShop, useCartCount } from "@/contexts/shop";
-import type { Compat, Product } from "@/lib/types";
+import type { Compat, ProductWithStock } from "@/lib/types";
 import { useCatalogFilters } from "@/hooks/useCatalogFilters";
+import { Drawer } from "@/components/Drawer";
+import { EUR } from "@/lib/utils";
 
-const EUR = (n: number) =>
-  new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(n);
 const BASE_PRICE = 3.0;
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="text-2xl font-bold">{children}</h2>;
 }
 
-// --------- Lokalni Drawer za "Brzi pregled" ---------
-function Drawer({
-  open,
-  onClose,
-  children,
-  title,
-}: {
-  open: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <div className={`fixed inset-0 z-50 ${open ? "pointer-events-auto" : "pointer-events-none"}`}>
-      <div
-        onClick={onClose}
-        className={`absolute inset-0 bg-black/30 transition-opacity ${open ? "opacity-100" : "opacity-0"}`}
-      />
-      <aside
-        className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow border-l transition-transform ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">{title}</h3>
-          <button onClick={onClose} className="px-2 py-1 rounded-md border cursor-pointer">
-            Zatvori
-          </button>
-        </div>
-        <div className="p-4 overflow-y-auto h-[calc(100%-56px)]">{children}</div>
-      </aside>
-    </div>
-  );
-}
-
-// Local structural types (no `any`)
-type QuantityByColor = Record<string, number>;
-type ProductWithStock = Product & { quantityByColor?: QuantityByColor };
-
-type CartLine = {
-  id?: string;                 // catalog group id (optional)
-  productId?: string;          // DB variant id
-  product?: ProductWithStock | { id?: string } | null;
-  color?: string;
-  qty: number;
-  // allow extra unknown data from context without using `any`
-  [key: string]: unknown;
-};
-
 function isObject(x: unknown): x is Record<string, unknown> {
   return typeof x === "object" && x !== null;
 }
 
-export default function Page() {
+export default function PhoneCaseStoreApp() {
   const { addToCart, quick, setQuick, setCartOpen, cart, setCart } = useShop();
   const cartCount = useCartCount();
 
@@ -83,28 +34,16 @@ export default function Page() {
   }, []);
   const isMobile = width < 980;
 
-  const goTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const {
     model, setModel,
     type, setType,
-    phone, setPhone,
+    setPhone,
     filtered,
     availableModels,
-    availableTypes,
     availablePhones,
     products
   } = useCatalogFilters();
 
-  /**
-   * Reverse indices for fast lookups:
-   * - byGroupId: Product by catalog group product.id (already used)
-   * - byVariantId: Product by variant (DB) id, so we can resolve cart lines that store `productId`
-   * - variantDefaultColor: default color per variant id (fallback if cart color missing)
-   */
   const { byGroupId, byVariantId, variantDefaultColor } = useMemo(() => {
     const _byGroup: Record<string, ProductWithStock> = {};
     const _byVar: Record<string, ProductWithStock> = {};
@@ -122,7 +61,7 @@ export default function Page() {
     return { byGroupId: _byGroup, byVariantId: _byVar, variantDefaultColor: _varDefault };
   }, [products]);
 
-  // ===== Cart sanitizer that *only* removes/clamps when real stock info exists =====
+  // ===== Cart sanitizer that only removes/clamps when real stock info exists =====
   useEffect(() => {
     if (!Array.isArray(cart) || !products?.length) return;
 
@@ -130,20 +69,25 @@ export default function Page() {
 
     const next = (cart as unknown[]).flatMap((raw) => {
       if (!isObject(raw)) { changed = true; return []; }
-      const line = raw as CartLine;
+      const line = raw as {
+        id?: string;
+        productId?: string;
+        product?: ProductWithStock | { id?: string } | null;
+        color?: string;
+        qty: number;
+        [key: string]: unknown;
+      };
 
-      // Ensure we can resolve the product from either the bundled `product` or the variant id we store as `productId`
+      // resolve product from bundled or variant id or group id
       let product: ProductWithStock | undefined;
 
       if (line.product && isObject(line.product) && typeof (line.product as { id?: string }).id === "string") {
         const pid = (line.product as { id?: string }).id;
         if (pid) product = byGroupId[pid];
       }
-
       if (!product && typeof line.productId === "string") {
         product = byVariantId[line.productId];
       }
-
       if (!product && typeof line.id === "string") {
         product = byGroupId[line.id];
       }
@@ -157,19 +101,15 @@ export default function Page() {
       }
 
       if (!product || !color || typeof line.qty !== "number") {
-        // Cannot resolve yet — keep the line as-is (don’t nuke the cart!)
         return [line];
       }
 
-      // Attach product for downstream UI (optional)
       const lineWithProduct = line.product ? line : { ...line, product };
       if (!line.product) changed = true;
 
-      // Stock logic
       const hasStockInfo =
         product.quantityByColor && Object.keys(product.quantityByColor).length > 0;
 
-      // When stock unknown, don't remove; cap softly at 10 to avoid silly values
       const rawLeft = hasStockInfo ? (product.quantityByColor![color] ?? 0) : 10;
       const left = Math.max(0, Math.min(10, rawLeft));
 
@@ -186,7 +126,7 @@ export default function Page() {
 
   const getMaxQty = (p: ProductWithStock, color: string) => {
     const hasStockInfo = p.quantityByColor && Object.keys(p.quantityByColor).length > 0;
-    const rawLeft = hasStockInfo ? (p.quantityByColor?.[color] ?? 0) : 10; // default limit when unknown
+    const rawLeft = hasStockInfo ? (p.quantityByColor?.[color] ?? 0) : 10;
     return Math.max(0, Math.min(10, rawLeft));
   };
 
@@ -213,10 +153,9 @@ export default function Page() {
         {/* Hero */}
         <section
           className={`flex gap-10 md:gap-14 min-h-[30vh] ${
-            !isMobile ? "flex-row justify-between" : "flex-col"
+            isMobile ? "flex-col" : "flex-row justify-between"
           } items-center`}
         >
-          {/* Text – left or top */}
           <div
             className={`w-full flex-1 ${!isMobile ? "text-left items-start" : "text-center items-center"} flex flex-col`}
           >
@@ -231,7 +170,6 @@ export default function Page() {
             </p>
           </div>
 
-          {/* Image – right or bottom */}
           <div className="w-full flex-1 relative flex items-center justify-center">
             <img
               src="/iphone16pro_4k_transparent_png8.png"
@@ -241,7 +179,7 @@ export default function Page() {
           </div>
         </section>
 
-        {/* Katalog s izborom modela */}
+        {/* Katalog */}
         <section id="catalog" className="space-y-4 scroll-mt-24 md:scroll-mt-28">
           <SectionTitle>Istraži ponudu</SectionTitle>
           <div className="grid sm:grid-cols-3 gap-4 items-end">
@@ -267,7 +205,7 @@ export default function Page() {
                 <ProductCard
                   product={p}
                   model={model}
-                  onAdd={(prod, color, qty = 1) => safeAdd(prod as ProductWithStock, color, qty)}
+                  onAdd={(prod, color, qty = 1) => safeAdd(prod, color, qty)}
                   onQuickView={(prod, color) => setQuick({ product: prod, color })}
                 />
               </div>
@@ -283,7 +221,7 @@ export default function Page() {
         <div className="max-w-7xl mx-auto px-4 py-10 grid md:grid-cols-3 gap-8">
           <div>
             <div className="flex items-center gap-2">
-              <a href="#top" onClick={goTop} className="flex items-center gap-2 select-none" aria-label="Na vrh stranice">
+              <a href="#top" className="flex items-center gap-2 select-none" aria-label="Na vrh stranice">
                 <span className="inline-flex h-6 w-6 rounded-full bg-gradient-to-tr from-zinc-900 to-zinc-700 ring-1 ring-black/10 shadow-sm" />
                 <span className="font-semibold tracking-tight">maskino</span>
               </a>
@@ -314,49 +252,15 @@ export default function Page() {
       </footer>
 
       {/* Brzi pregled — model zaključan na odabrani */}
-      <Drawer open={!!quick} onClose={() => setQuick(null)} title={quick ? quick.product.name : "Brzi pregled"}>
-        {quick && (
-          <div className="space-y-4">
-            <img
-              src={quick.product.imageByColor[quick.color] ?? quick.product.imageByColor[quick.product.defaultColor]}
-              alt={`${quick.product.name} – ${quick.color}`}
-              className="w-full h-48 object-cover rounded-lg border"
-            />
-            <div className="text-sm text-gray-600">
-              Model: <span className="font-medium">{model}</span> (zaključano)
-            </div>
-
-            <div>
-              <label className="text-sm">Boja</label>
-              <select
-                value={quick.color}
-                onChange={(e) => setQuick({ product: quick.product, color: e.target.value })}
-                className="mt-1 w-full px-3 py-2 rounded-lg border"
-              >
-                {quick.product.colors.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                onClick={() => {
-                  // Use safeAdd here too to honor stock logic
-                  safeAdd(quick.product as ProductWithStock, quick.color, 1);
-                  setQuick(null);
-                  setCartOpen(true);
-                }}
-              >
-                Dodaj u košaricu • {EUR(BASE_PRICE)}
-              </Button>
-              <Button variant="outline" onClick={() => setQuick(null)}>
-                Zatvori
-              </Button>
-            </div>
-          </div>
-        )}
-      </Drawer>
+      <Drawer
+        quick={quick as any}   // context QuickState uses Product; Drawer expects ProductWithStock locally
+        setQuick={setQuick as any}
+        model={model}
+        safeAdd={safeAdd}
+        setCartOpen={setCartOpen}
+        priceFormatter={EUR}
+        basePrice={BASE_PRICE}
+      />
     </div>
   );
 }

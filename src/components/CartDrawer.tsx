@@ -5,11 +5,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useShop } from "@/contexts/shop";
 import API from "@/lib/api";
-import type { BackendProduct, Product, Compat } from "@/lib/types";
-import {useCatalogFilters} from "@/hooks/useCatalogFilters";
-
-const EUR = (n: number) =>
-  new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(n);
+import type { Compat } from "@/lib/types";
+import { useCatalogFilters } from "@/hooks/useCatalogFilters";
+import { EUR } from "@/lib/utils";
 
 type Customer = {
   first_name: string;
@@ -28,7 +26,7 @@ export default function CartDrawer() {
   const { cartOpen, setCartOpen, cart, setCart } = useShop();
 
   // Load catalog so we can render names/images/prices regardless of route
-  const { products } = useCatalogFilters()
+  const { products } = useCatalogFilters();
 
   // Customer form state (persist to localStorage)
   const [customer, setCustomer] = useState<Customer>({
@@ -163,7 +161,7 @@ export default function CartDrawer() {
           </button>
         </div>
 
-        {/* Everything INSIDE the drawer */}
+        {/* Drawer content */}
         <div className="p-4 overflow-y-auto h-[calc(100%-56px)] space-y-3">
           {/* Items */}
           {cart.length === 0 && <p className="text-sm text-gray-600">Vaša košarica je prazna.</p>}
@@ -199,7 +197,9 @@ export default function CartDrawer() {
                     onClick={() =>
                       setCart((c) =>
                         c.map((x) =>
-                          keyOf(x) === itemKey ? { ...x, qty: Math.max(1, x.qty - 1) } : x
+                          itemKey === `${x.productId}-${x.model}-${x.color}`
+                            ? { ...x, qty: Math.max(1, x.qty - 1) }
+                            : x
                         )
                       )
                     }
@@ -212,7 +212,9 @@ export default function CartDrawer() {
                     value={it.qty}
                     onChange={(e) => {
                       const v = Math.max(1, Number(e.target.value) || 1);
-                      setCart((c) => c.map((x) => (keyOf(x) === itemKey ? { ...x, qty: v } : x)));
+                      setCart((c) =>
+                        c.map((x) => (itemKey === `${x.productId}-${x.model}-${x.color}` ? { ...x, qty: v } : x))
+                      );
                     }}
                     aria-label="Količina"
                   />
@@ -220,7 +222,11 @@ export default function CartDrawer() {
                     className="w-7 h-7 border rounded cursor-pointer"
                     onClick={() =>
                       setCart((c) =>
-                        c.map((x) => (keyOf(x) === itemKey ? { ...x, qty: x.qty + 1 } : x))
+                        c.map((x) =>
+                          itemKey === `${x.productId}-${x.model}-${x.color}`
+                            ? { ...x, qty: x.qty + 1 }
+                            : x
+                        )
                       )
                     }
                     aria-label="Povećaj količinu"
@@ -233,7 +239,7 @@ export default function CartDrawer() {
 
                 <button
                   className="text-sm text-red-600 cursor-pointer"
-                  onClick={() => setCart((c) => c.filter((x) => keyOf(x) !== itemKey))}
+                  onClick={() => setCart((c) => c.filter((x) => `${x.productId}-${x.model}-${x.color}` !== itemKey))}
                 >
                   Ukloni
                 </button>

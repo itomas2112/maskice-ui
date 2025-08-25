@@ -1,10 +1,8 @@
-import React, {useEffect, useMemo, useState} from "react";
-import {Check, Heart} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import { Product, Compat } from "@/lib/types";
-
-const EUR = (n: number) =>
-  new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(n);
+import React, { useEffect, useMemo, useState } from "react";
+import { Check, Heart } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { ProductWithStock, Compat } from "@/lib/types";
+import { EUR } from "@/lib/utils";
 
 export function ProductCard({
   product,
@@ -12,10 +10,10 @@ export function ProductCard({
   onAdd,
   onQuickView,
 }: {
-  product: Product & { quantityByColor?: Record<string, number> }; // NEW: allow runtime stock map
+  product: ProductWithStock;                           // centralized type
   model: Compat;
-  onAdd: (p: Product, color: string, qty: number) => void;
-  onQuickView: (p: Product, color: string, qty: number) => void;
+  onAdd: (p: ProductWithStock, color: string, qty: number) => void;
+  onQuickView: (p: ProductWithStock, color: string, qty: number) => void;
 }) {
   const [cardColor, setCardColor] = useState<string>(product.defaultColor);
   const [quantity, setQuantity] = useState<number>(1);
@@ -28,19 +26,17 @@ export function ProductCard({
     product.imageByColor[product.defaultColor];
 
   // --- STOCK HELPERS ----------------------------------------------------- //
-  const stockLeft = product.quantityByColor?.[cardColor] ?? 0;                   // NEW
-  const maxSelectable = Math.max(0, Math.min(10, stockLeft));                    // NEW (cap at 10)
-  const qtyOptions = useMemo(                                                     // NEW
+  const stockLeft = product.quantityByColor?.[cardColor] ?? 0;
+  const maxSelectable = Math.max(0, Math.min(10, stockLeft));
+  const qtyOptions = useMemo(
     () => Array.from({ length: maxSelectable }, (_, i) => i + 1),
     [maxSelectable]
   );
 
-  // If user switches to a color with less stock, clamp the selected qty       // NEW
   useEffect(() => {
     if (quantity > maxSelectable) setQuantity(Math.max(1, maxSelectable));
   }, [maxSelectable, quantity]);
 
-  // Load liked state from localStorage
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("likedProducts") || "[]");
     if (stored.includes(product.id)) setLiked(true);
@@ -62,11 +58,8 @@ export function ProductCard({
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    // Clamp requested qty against stock (defensive)                          // NEW
     const safeQty = Math.min(quantity, maxSelectable);
     if (safeQty <= 0) return;
-
     onAdd(product, cardColor, safeQty);
     setAdded(true);
     setTimeout(() => setAdded(false), 900);
@@ -107,7 +100,7 @@ export function ProductCard({
           />
         </button>
 
-        {/* Stock badge (optional, but useful) */}                               {/* NEW */}
+        {/* Stock badge */}
         <div className="absolute left-2 top-2 text-xs px-2 py-1 rounded bg-white/80 border">
           Na stanju: <span className="font-semibold">{stockLeft}</span>
         </div>
@@ -131,7 +124,7 @@ export function ProductCard({
             Boja &amp; Količina
           </label>
           <div className="flex gap-2 sm:flex-row flex-col">
-            {/* Color select: disable out-of-stock colors */}                    {/* NEW */}
+            {/* Color select */}
             <select
               value={cardColor}
               onChange={(e) => setCardColor(e.target.value)}
@@ -150,7 +143,7 @@ export function ProductCard({
               })}
             </select>
 
-            {/* Quantity select capped by stock (and 10) */}                    {/* NEW */}
+            {/* Quantity select */}
             <select
               value={Math.min(quantity, maxSelectable)}
               onChange={(e) => setQuantity(Number(e.target.value))}
@@ -177,10 +170,10 @@ export function ProductCard({
               added ? "bg-gray-300 text-gray-700" : ""
             }`}
             onClick={handleAdd}
-            disabled={added || maxSelectable <= 0}                             // NEW
+            disabled={added || maxSelectable <= 0}
           >
             {maxSelectable <= 0
-              ? "Nema na zalihi"                                              // NEW
+              ? "Nema na zalihi"
               : added
                 ? <span className="flex items-center justify-center gap-1">
                     <Check className="w-4 h-4" /> Dodano

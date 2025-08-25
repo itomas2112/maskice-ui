@@ -2,10 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { Compat, Product, BackendProduct } from "@/lib/types";
-
-export type CartItem = { model: Compat; color: string; qty: number; productId: string };
-export type QuickState = { product: Product; color: string } | null;
+import type { Compat, Product, BackendProduct, CartItem, QuickState } from "@/lib/types";
 
 type ShopContextType = {
   cart: CartItem[];
@@ -20,7 +17,7 @@ type ShopContextType = {
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
-// storage keys + basic schema versioning (handy if you change the shape later)
+// storage keys + basic schema versioning
 const CART_KEY = "shop.cart.v1";
 const CARTOPEN_KEY = "shop.cartOpen.v1";
 
@@ -70,8 +67,8 @@ const normalize = (bp: BackendProduct): Product | null => {
     imageByColor,
     productIdByColor,
     defaultColor,
-    type: bp.type,   // ✅ keep type from backend
-    phone: bp.phone, // ✅ keep phone from backend
+    type: bp.type,
+    phone: bp.phone,
   };
 };
 
@@ -80,7 +77,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [cartOpen, setCartOpen] = useState<boolean>(false);
   const [quick, setQuick] = useState<QuickState>(null);
 
-  // --- hydrate from localStorage on mount
+  // hydrate from localStorage
   useEffect(() => {
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem(CART_KEY) : null;
@@ -93,40 +90,33 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       }
       const openRaw = typeof window !== "undefined" ? localStorage.getItem(CARTOPEN_KEY) : null;
       if (openRaw) setCartOpen(JSON.parse(openRaw) === true);
-    } catch {
-      // ignore corrupt storage
-    }
+    } catch {}
   }, []);
 
-  // --- persist to localStorage whenever cart changes
+  // persist cart (debounced)
   const saveTimeout = useRef<number | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // small debounce to avoid spam during rapid +/- clicks
     if (saveTimeout.current) window.clearTimeout(saveTimeout.current);
     saveTimeout.current = window.setTimeout(() => {
       try {
         localStorage.setItem(CART_KEY, JSON.stringify(cart));
-      } catch {
-        // ignore quota errors
-      }
+      } catch {}
     }, 120);
     return () => {
       if (saveTimeout.current) window.clearTimeout(saveTimeout.current);
     };
   }, [cart]);
 
-  // persist cartOpen (optional)
+  // persist cartOpen
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       localStorage.setItem(CARTOPEN_KEY, JSON.stringify(cartOpen));
-    } catch {
-      // ignore quota errors
-    }
+    } catch {}
   }, [cartOpen]);
 
-  // --- cross-tab sync (so adding in one tab updates others)
+  // cross-tab sync
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === CART_KEY && e.newValue) {
@@ -136,9 +126,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
             const sane = next.filter(isCartItemLike);
             setCart(sane);
           }
-        } catch {
-          // ignore malformed JSON
-        }
+        } catch {}
       }
       if (e.key === CARTOPEN_KEY && e.newValue) {
         try {
@@ -183,7 +171,6 @@ export function useShop(): ShopContextType {
   return ctx;
 }
 
-// convenience
 export function useCartCount(): number {
   const { cart } = useShop();
   return useMemo(() => cart.reduce((s, it) => s + it.qty, 0), [cart]);

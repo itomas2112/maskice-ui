@@ -1,3 +1,5 @@
+export type Compat = "iPhone 16" | "iPhone 16 Pro";
+
 export type Product = {
   id: string;
   name: string;
@@ -7,11 +9,15 @@ export type Product = {
   imageByColor: Record<string, string>;
   productIdByColor: Record<string, string>;
   defaultColor: string;
-  type: string;   // ← NEW
-  phone: string;  // ← NEW
+  type: string;   // ← kept
+  phone: string;  // ← kept
 };
 
-export type Compat = "iPhone 16" | "iPhone 16 Pro";
+/** Per-color stock map */
+export type QuantityByColor = Record<string, number>;
+
+/** Product with optional stock info (frontend-enriched) */
+export type ProductWithStock = Product & { quantityByColor?: QuantityByColor };
 
 export type BackendProduct = {
   id: string;
@@ -20,7 +26,7 @@ export type BackendProduct = {
   price_cents: number;
   type: string;
   phone: string;
-  variants: { product_id: string; colors: string; image: string, quantity: number }[];
+  variants: { product_id: string; colors: string; image: string; quantity: number }[];
 };
 
 export type CartItem = {

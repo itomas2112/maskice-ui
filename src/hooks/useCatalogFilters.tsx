@@ -1,11 +1,8 @@
 // src/hooks/useCatalogFilters.ts
 import { useEffect, useMemo, useState } from "react";
-import type { BackendProduct, Compat, Product } from "@/lib/types";
+import type { BackendProduct, Compat, Product, ProductWithStock, QuantityByColor } from "@/lib/types";
 import API from "@/lib/api";
 import { useShop } from "@/contexts/shop";
-
-type QuantityByColor = Record<string, number>;
-type ProductWithStock = Product & { quantityByColor: QuantityByColor };
 
 // ——— helpers without using `any`
 function getStringFromKeys(obj: Record<string, unknown>, keys: string[]): string | undefined {
@@ -36,31 +33,31 @@ export function useCatalogFilters() {
     API.get<BackendProduct[]>("/products")
       .then((res) => {
         const rows = res.data ?? [];
-
-        const normalized: ProductWithStock[] = rows
-          .map((row) => {
+  
+        const normalized = rows
+          .map((row): ProductWithStock | null => {
             const base = normalize(row);
             if (!base) return null;
-
+  
             const quantityByColor: QuantityByColor = {};
-
-            const variants = (row as unknown as { variants?: unknown[] }).variants ?? [];
+            const variants = (row as { variants?: unknown[] }).variants ?? [];
             for (const vv of variants) {
               if (typeof vv !== "object" || vv === null) continue;
               const v = vv as Record<string, unknown>;
-
-              // Be lenient with backend field names: colors/color & quantity/qty
+  
+              // Be lenient with backend field names
               const colorKey = getStringFromKeys(v, ["colors", "color", "colour", "Color"]);
               if (!colorKey) continue;
-
+  
               const q = getNumberLikeFromKeys(v, ["quantity", "qty", "stok", "Quantity"], 0);
               quantityByColor[colorKey] = q;
             }
-
-            return { ...(base as Product), quantityByColor };
+  
+            // Always return ProductWithStock
+            return { ...base, quantityByColor };
           })
-          .filter((x): x is ProductWithStock => !!x);
-
+          .filter((x): x is ProductWithStock => x !== null);
+  
         setProducts(normalized);
         setLoading(false);
       })
@@ -70,14 +67,12 @@ export function useCatalogFilters() {
       });
   }, [normalize]);
 
-  // All models present in catalog
   const availableModels = useMemo(() => {
     const set = new Set<Compat>();
     for (const p of products) set.add(p.compat);
     return Array.from(set);
   }, [products]);
 
-  // Types/phones for the selected model
   const availableTypes = useMemo(() => {
     const set = new Set<string>();
     for (const p of products) if (p.compat === model && p.type) set.add(p.type);
@@ -90,7 +85,6 @@ export function useCatalogFilters() {
     return Array.from(set);
   }, [products, model]);
 
-  // Filtered products
   const filtered = useMemo(
     () =>
       products.filter(
@@ -102,7 +96,6 @@ export function useCatalogFilters() {
     [products, model, type, phone]
   );
 
-  // Keep selections valid when data changes
   useEffect(() => {
     if (availableModels.length && !availableModels.includes(model)) {
       setModel(availableModels[0]);

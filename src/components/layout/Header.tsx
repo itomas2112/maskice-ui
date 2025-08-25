@@ -43,11 +43,9 @@ export function Header({
   useEffect(() => {
     if (mobileOpen) {
       document.documentElement.classList.add("overflow-hidden", "touch-pan-y");
-      // always start at root when opening
       setMobileStep("root");
     } else {
       document.documentElement.classList.remove("overflow-hidden", "touch-pan-y");
-      // optional: reset back to root on close
       setMobileStep("root");
     }
     return () => document.documentElement.classList.remove("overflow-hidden", "touch-pan-y");
@@ -70,12 +68,8 @@ export function Header({
     setMobileStep("phones");
   };
 
-  // Shared: choose phone and close menus/flyouts
   const choosePhone = (ph: string) => {
-  
-    type&&router.push(`/shop/${typeToSlug(type)}/${phoneToSlug(ph)}`);
-  
-    // Close UI
+    type && router.push(`/shop/${typeToSlug(type)}/${phoneToSlug(ph)}`);
     setPhone?.(ph);
     setShowPhones(false);
     setMobileOpen(false);
@@ -102,7 +96,7 @@ export function Header({
           <span className="font-semibold tracking-tight">maskino</span>
         </Link>
 
-        {/* Center: main nav (hidden on mobile; visible ≥ sm) */}
+        {/* Center nav */}
         <nav className="hidden sm:flex justify-self-center items-center gap-6 sm:gap-8 text-sm sm:text-[0.95rem]">
           <span
             className="cursor-pointer font-medium hover:underline underline-offset-4 text-gray-700"
@@ -118,7 +112,7 @@ export function Header({
           </span>
         </nav>
 
-        {/* Right: actions + hamburger (hamburger only on mobile) */}
+        {/* Right */}
         <div className="flex items-center gap-2 justify-self-end">
           <Link href="/liked" aria-label="Favorite products">
             <Button
@@ -145,7 +139,7 @@ export function Header({
             </Button>
           )}
 
-          {/* Hamburger: only show on mobile */}
+          {/* Hamburger */}
           <Button
             type="button"
             variant="outline"
@@ -180,11 +174,10 @@ export function Header({
         </div>
       )}
 
-      {/* Mobile full-screen menu with 2 steps via portal */}
+      {/* Mobile full-screen menu */}
       {mounted && mobileOpen &&
         createPortal(
           <div className="fixed inset-0 z-[100] sm:hidden bg-white" role="dialog" aria-modal="true">
-            {/* Top bar inside the menu */}
             <div className="px-4 py-3 flex items-center justify-between border-b border-black/10">
               <div className="flex items-center gap-2">
                 {mobileStep === "phones" && (
@@ -209,7 +202,6 @@ export function Header({
               </button>
             </div>
 
-            {/* Step content */}
             {mobileStep === "root" ? (
               <nav className="px-4 py-4">
                 <div className="flex flex-col rounded-xl overflow-hidden border border-black/10 divide-y divide-black/10">
