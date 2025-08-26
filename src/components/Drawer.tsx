@@ -1,9 +1,10 @@
 // src/components/Drawer.tsx
 "use client";
 
-import React from "react";
+import React, {useEffect, useMemo, useState} from "react";
 import { Button } from "@/components/ui/button";
 import type { ProductWithStock } from "@/lib/types";
+import {Check} from "lucide-react";
 
 /* ---- QuickView local state (kept local to avoid changing context type) ---- */
 export type QuickState = { product: ProductWithStock; color: string } | null;
@@ -64,6 +65,30 @@ export function Drawer({
   priceFormatter,
   basePrice,
 }: DrawerProps) {
+
+  const [added, setAdded] = useState<boolean>(false)
+  const [quantity, setQuantity] = useState<number>(1);
+  const [cardColor, setCardColor] = useState<string>(() =>
+    quick?.product.defaultColor ?? quick?.product.colors?.[0] ?? ""
+  );
+  
+  // 2) When the drawer changes to a new product, resync the color
+  useEffect(() => {
+    if (!quick) return;
+    setCardColor(quick.product.defaultColor ?? quick.product.colors?.[0] ?? "");
+  }, [quick]);
+
+  const stockLeft = quick?quick.product.quantityByColor?.[cardColor] : 0;
+  const maxSelectable = Math.max(0, Math.min(10, stockLeft));
+  const qtyOptions = useMemo(
+    () => Array.from({ length: maxSelectable }, (_, i) => i + 1),
+    [maxSelectable]
+  );
+
+  useEffect(() => {
+    if (quantity > maxSelectable) setQuantity(Math.max(1, maxSelectable));
+  }, [maxSelectable, quantity]);
+  
   const open = !!quick;
   const title = quick ? quick.product.name : "Brzi pregled";
 
@@ -71,43 +96,82 @@ export function Drawer({
     <DrawerShell open={open} onClose={() => setQuick(null)} title={title}>
       {quick && (
         <div className="space-y-4">
-          <img
-            src={
-              quick.product.imageByColor[quick.color] ??
-              quick.product.imageByColor[quick.product.defaultColor]
-            }
-            alt={`${quick.product.name} – ${quick.color}`}
-            className="w-full h-48 object-cover rounded-lg border"
-          />
+          
+          <div className="basis-[75%] relative flex items-center justify-center p-2 overflow-hidden rounded-lg">
+            <img
+              src={
+                quick.product.imageByColor[quick.color] ??
+                quick.product.imageByColor[quick.product.defaultColor]
+              }
+              alt={`${quick.product.name} – ${quick.color}`}
+              className="max-h-full max-w-full object-contain rounded-lg"
+              draggable={false}
+            />
+          </div>
 
           <div className="text-sm text-gray-600">
             Model: <span className="font-medium">{model}</span> (zaključano)
           </div>
-
-          <div>
-            <label className="text-sm">Boja</label>
-            <select
-              value={quick.color}
-              onChange={(e) => setQuick({ product: quick.product, color: e.target.value })}
-              className="mt-1 w-full px-3 py-2 rounded-lg border"
-            >
-              {quick.product.colors.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+          
+          <div className="flex gap-3">
+            {/* Color */}
+            <div className="flex-1">
+              <label className="block text-sm mb-1">Boja</label>
+              <select
+                value={quick.color}
+                onChange={(e) => setQuick({ product: quick.product, color: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border cursor-pointer"
+              >
+                {quick.product.colors.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          
+            {/* Quantity */}
+            <div className="w-28">
+              <label className="block text-sm mb-1">Količina</label>
+              <select
+                value={Math.min(quantity, maxSelectable)}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-lg border cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+                aria-label="Odaberi količinu"
+                disabled={maxSelectable === 0}
+              >
+                {qtyOptions.length > 0 ? (
+                  qtyOptions.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))
+                ) : (
+                  <option value={0}>0</option>
+                )}
+              </select>
+            </div>
           </div>
+
 
           <div className="flex gap-2">
             <Button
+              variant={added ? "secondary" : "default"}
+              className={`w-full transition-colors duration-300 cursor-pointer`}
               onClick={() => {
                 safeAdd(quick.product, quick.color, 1);
-                setQuick(null);
-                setCartOpen(true);
+                setAdded(true);
+                setTimeout(() => setAdded(false), 900);
               }}
             >
-              Dodaj u košaricu • {priceFormatter(basePrice)}
+              {added ? (
+                <span className="flex items-center justify-center gap-1">
+                  <Check className="w-4 h-4" /> Dodano
+                </span>
+              ) : (
+                `Dodaj u košaricu • ${priceFormatter(basePrice)}`
+              )}
             </Button>
-            <Button variant="outline" onClick={() => setQuick(null)}>
+            <Button className="cursor-pointer" variant="outline" onClick={() => setQuick(null)}>
               Zatvori
             </Button>
           </div>

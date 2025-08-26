@@ -2,15 +2,11 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import API from "@/lib/api";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/ProductCard";
-import { Product, BackendProduct, Compat } from "@/lib/types";
 import { useShop } from "@/contexts/shop";
 import {useCatalogFilters} from "@/hooks/useCatalogFilters";
-
-const fixPublicPath = (p: string) => p.replace(/^\/public(\/|$)/, "/");
 
 export default function LikedPage() {
   const [likedIds, setLikedIds] = useState<string[]>([]);
@@ -38,10 +34,6 @@ export default function LikedPage() {
     localStorage.setItem("likedProducts", JSON.stringify([]));
     setLikedIds([]);
   };
-
-  // no-op handlers to satisfy ProductCard props; you can wire these to your cart/quickview later
-  const noopAdd = () => {};
-  const noopQuick = () => {};
   
   const {
     type, setType, setPhone,
