@@ -58,7 +58,7 @@ const normalize = (bp: BackendProduct): Product | null => {
 
   for (const v of bp.variants ?? []) {
     imageByColor[v.colors] = fixPublicPath(v.image);
-    productIdByColor[v.colors] = String(v.product_id);
+    productIdByColor["id"] = String(v.product_id);
     colors.push(v.colors);
   }
 

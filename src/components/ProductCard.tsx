@@ -3,6 +3,7 @@ import { Check, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ProductWithStock, Compat } from "@/lib/types";
 import { EUR } from "@/lib/utils";
+import {useCart} from "@/hooks/useCart";
 
 export function ProductCard({
   product,
@@ -19,6 +20,7 @@ export function ProductCard({
   const [quantity, setQuantity] = useState<number>(1);
   const [added, setAdded] = useState<boolean>(false);
   const [liked, setLiked] = useState<boolean>(false);
+  const { add } = useCart()
 
   const price = product.price_cents / 100;
   const imgSrc =
@@ -60,7 +62,13 @@ export function ProductCard({
     e.stopPropagation();
     const safeQty = Math.min(quantity, maxSelectable);
     if (safeQty <= 0) return;
-    onAdd(product, cardColor, safeQty);
+    add({
+      product_id: product.productIdByColor["id"],       // variant id
+      model: product.compat,
+      color: product.defaultColor,
+      qty: safeQty, // optional; defaults to 1
+    })
+    // onAdd(product, cardColor, safeQty);
     setAdded(true);
     setTimeout(() => setAdded(false), 900);
   };
