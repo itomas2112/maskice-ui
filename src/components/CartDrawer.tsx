@@ -23,8 +23,12 @@ const CUSTOMER_KEY = "shop.customer.v1";
 
 export default function CartDrawer() {
   const { cartOpen, setCartOpen } = useShop();
-  const { cart, setQty, remove } = useCart();
-  
+  const { cart, setQty, remove, refresh } = useCart();
+
+  useEffect(() => {
+    if (cartOpen) refresh();  // important: re-pull after add and when cookie is present
+  }, [cartOpen, refresh]);
+
   // Customer form state (persist to localStorage)
   const [customer, setCustomer] = useState<Customer>({
     first_name: "",
@@ -143,6 +147,13 @@ export default function CartDrawer() {
                 className="flex items-center justify-between gap-3 rounded-lg p-3 border bg-white"
               >
                 <div className="flex items-center gap-3">
+                  {it.image && (
+                    <img
+                      src={it.image}
+                      alt={it.name}
+                      className="w-16 h-16 object-cover rounded border"
+                    />
+                  )}
                   {/* You can still resolve image from catalog if you need */}
                   <div>
                     <div className="text-sm font-medium">{it.name}</div>
@@ -156,7 +167,7 @@ export default function CartDrawer() {
                   <button
                     className="w-7 h-7 border rounded cursor-pointer"
                     onClick={() =>
-                      setQty({ ...it, qty: Math.max(1, it.qty - 1) })
+                      (it.qty>1)&&setQty({ ...it, qty: -1 })
                     }
                   >
                     −
@@ -171,7 +182,7 @@ export default function CartDrawer() {
                   <button
                     className="w-7 h-7 border rounded cursor-pointer"
                     onClick={() =>
-                      setQty({ ...it, qty: it.qty + 1 })
+                      setQty({ ...it, qty: 1 })
                     }
                   >
                     +
@@ -213,9 +224,71 @@ export default function CartDrawer() {
           {/* Shipping form */}
           {cart && cart.items.length > 0 && (
             <div className="mt-3 space-y-3 border rounded-lg p-3 bg-white">
-              {/* ... keep your customer form unchanged ... */}
+              <div className="font-medium">Podaci za dostavu</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  className="border rounded-md px-3 py-2"
+                  placeholder="Ime"
+                  value={customer.first_name}
+                  onChange={(e) => setCustomer({ ...customer, first_name: e.target.value })}
+                />
+                <input
+                  className="border rounded-md px-3 py-2"
+                  placeholder="Prezime"
+                  value={customer.last_name}
+                  onChange={(e) => setCustomer({ ...customer, last_name: e.target.value })}
+                />
+              </div>
+              <input
+                className="border rounded-md px-3 py-2 w-full"
+                placeholder="Email"
+                type="email"
+                value={customer.email}
+                onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
+              />
+              <input
+                className="border rounded-md px-3 py-2 w-full"
+                placeholder="Adresa (ulica i broj)"
+                value={customer.address_line1}
+                onChange={(e) => setCustomer({ ...customer, address_line1: e.target.value })}
+              />
+              <input
+                className="border rounded-md px-3 py-2 w-full"
+                placeholder="Adresa 2 (opcionalno)"
+                value={customer.address_line2 ?? ""}
+                onChange={(e) => setCustomer({ ...customer, address_line2: e.target.value })}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  className="border rounded-md px-3 py-2"
+                  placeholder="Grad"
+                  value={customer.city}
+                  onChange={(e) => setCustomer({ ...customer, city: e.target.value })}
+                />
+                <input
+                  className="border rounded-md px-3 py-2"
+                  placeholder="Poštanski broj"
+                  value={customer.postal_code}
+                  onChange={(e) => setCustomer({ ...customer, postal_code: e.target.value })}
+                />
+                <input
+                  className="border rounded-md px-3 py-2"
+                  placeholder="Država (npr. HR)"
+                  maxLength={2}
+                  value={customer.country}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, country: e.target.value.toUpperCase() })
+                  }
+                />
+              </div>
+              {!formOk && (
+                <div className="text-xs text-red-600">
+                  Molimo ispunite sva obavezna polja. Trenutno dostavljamo samo unutar RH.
+                </div>
+              )}
             </div>
           )}
+
 
           <Button
             className="w-full mt-3 cursor-pointer"

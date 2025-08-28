@@ -8,9 +8,9 @@ import React, { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { typeToSlug, phoneToSlug } from "@/lib/slug";
+import {useCart} from "@/hooks/useCart";
 
 type HeaderProps = {
-  cartCount: number;
   showBasket?: boolean;
   setCartOpen?: (value: boolean) => void;
   type: string | undefined
@@ -23,7 +23,6 @@ type MobileStep = "root" | "phones";
 
 export function Header({
   setCartOpen,
-  cartCount,
   showBasket = true,
   setType,
   type,
@@ -35,6 +34,7 @@ export function Header({
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [mobileStep, setMobileStep] = React.useState<MobileStep>("root");
   const [mounted, setMounted] = React.useState(false);
+  const { cartCount } = useCart()
 
   useEffect(() => setMounted(true), []);
   const router = useRouter();

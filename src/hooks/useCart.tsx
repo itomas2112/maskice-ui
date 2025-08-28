@@ -20,6 +20,7 @@ export type CartLineOut = {
   name: string;
   unit_price_cents: number;
   line_total_cents: number;
+  image: string;
 };
 
 export type CartSummaryOut = {
@@ -50,6 +51,9 @@ function withCartHeaders(cartId: string) {
   return { headers: { "X-Cart-Id": cartId } };
 }
 
+const CART_EVENT = "cart:changed";
+const broadcastCartChange = () => window.dispatchEvent(new Event(CART_EVENT));
+
 // ---------- Hook ----------
 export function useCart() {
   const cartId = useMemo(getOrCreateCartId, []);
@@ -70,40 +74,54 @@ export function useCart() {
     }
   }, [cartId]);
 
+  // 1) Initial load
   useEffect(() => { fetchCart(); }, [fetchCart]);
 
-  // --- Mutations ---
+  // 2) Listen for changes from *other* components/pages
+  useEffect(() => {
+    const onChanged = () => fetchCart();
+    window.addEventListener(CART_EVENT, onChanged);
+    return () => window.removeEventListener(CART_EVENT, onChanged);
+  }, [fetchCart]);
+
+  // --- Mutations (broadcast after successful server change) ---
   const add = useCallback(
     async (item: CartItemIn) => {
       await API.post("/cart/items", item, withCartHeaders(cartId));
-      await fetchCart();
+      broadcastCartChange();
     },
-    [cartId, fetchCart]
+    [cartId]
   );
 
   const setQty = useCallback(
     async (item: CartItemIn) => {
-      await API.patch("/cart/items", item, withCartHeaders(cartId));
-      await fetchCart();
+      await API.post("/cart/items", item, withCartHeaders(cartId));
+      broadcastCartChange();
     },
-    [cartId, fetchCart]
+    [cartId]
   );
 
   const remove = useCallback(
     async (item: Omit<CartItemIn, "qty">) => {
       await API.delete(
         `/cart/items/${item.product_id}/${item.color}/${item.model}`,
-        { ...withCartHeaders(cartId) } // wrap as config object
+        { ...withCartHeaders(cartId) }
       );
-      await fetchCart();
+      broadcastCartChange();
     },
-    [cartId, fetchCart]
+    [cartId]
   );
 
   const clear = useCallback(async () => {
     await API.delete("/cart", withCartHeaders(cartId));
-    await fetchCart();
-  }, [cartId, fetchCart]);
+    broadcastCartChange();
+  }, [cartId]);
+
+  // Derived
+  const cartCount = useMemo(
+    () => data?.items?.reduce((acc, it) => acc + it.qty, 0) ?? 0,
+    [data]
+  );
 
   return {
     cart: data,
@@ -114,7 +132,7 @@ export function useCart() {
     setQty,
     remove,
     clear,
-    itemCount: data?.items?.reduce((acc, it) => acc + it.qty, 0) ?? 0,
+    cartCount,
   };
 }
 
