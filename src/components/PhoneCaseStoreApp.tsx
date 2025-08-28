@@ -35,8 +35,7 @@ export default function PhoneCaseStoreApp() {
     setPhone,
     filtered,
     availableModels,
-    availablePhones,
-    products
+    availablePhones
   } = useCatalogFilters();
   
   const getMaxQty = (p: ProductWithStock, color: string) => {

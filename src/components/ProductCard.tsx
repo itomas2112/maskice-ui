@@ -16,7 +16,8 @@ export function ProductCard({
   const [quantity, setQuantity] = useState<number>(1);
   const [added, setAdded] = useState<boolean>(false);
   const [liked, setLiked] = useState<boolean>(false);
-  const { add } = useCart()
+  const [shake, setShake] = useState<boolean>(false);
+  const { add, noStock, cart } = useCart()
 
   const price = product.price_cents / 100;
   const imgSrc =
@@ -24,6 +25,14 @@ export function ProductCard({
     product.imageByColor[product.defaultColor];
 
   // --- STOCK HELPERS ----------------------------------------------------- //
+  
+  const cartQuantity =
+    cart?.items
+      ?.find(
+        (item) =>
+          item.product_id === product.productIdByColor.id
+      )
+      ?.qty ?? 0;
   const stockLeft = product.quantityByColor?.[cardColor] ?? 0;
   const maxSelectable = Math.max(0, Math.min(10, stockLeft));
   const qtyOptions = useMemo(
@@ -58,15 +67,20 @@ export function ProductCard({
     e.stopPropagation();
     const safeQty = Math.min(quantity, maxSelectable);
     if (safeQty <= 0) return;
-    add({
-      product_id: product.productIdByColor["id"],       // variant id
-      model: product.compat,
-      color: product.defaultColor,
-      qty: safeQty, // optional; defaults to 1
-    })
-    // onAdd(product, cardColor, safeQty);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 900);
+    if (cartQuantity + safeQty <= stockLeft) {
+      setAdded(true);
+      add({
+        product_id: product.productIdByColor["id"],       // variant id
+        model: product.compat,
+        color: product.defaultColor,
+        qty: safeQty, // optional; defaults to 1
+      })
+      // onAdd(product, cardColor, safeQty);
+      setTimeout(() => setAdded(false), 900);
+    } else {
+      setShake(true);
+      const t = setTimeout(() => setShake(false), 320);
+    }
   };
 
   const handleQuickView = () => onQuickView(product, cardColor, quantity);
@@ -172,7 +186,7 @@ export function ProductCard({
           <Button
             className={`w-full transition-colors duration-300 cursor-pointer ${
               added ? "bg-gray-300 text-gray-700" : ""
-            }`}
+            } ${shake ? "btn-shake" : ""}`}
             onClick={handleAdd}
             disabled={added || maxSelectable <= 0}
           >

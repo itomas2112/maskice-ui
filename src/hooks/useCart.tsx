@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import API from "@/lib/api"; // your axios instance
+import API from "@/lib/api";
+import {AxiosError} from "axios"; // your axios instance
 
 // ---------- Types (match your backend) ----------
 // ---------- Types (match new backend) ----------
@@ -70,7 +71,14 @@ export function useCart() {
   const [data, setData] = useState<CartSummaryOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [noStock, setNoStock] = useState<boolean>(false);
 
+  const triggerNoStock = () => {
+    setNoStock(true);
+    setTimeout(() => setNoStock(false), 1000); // reset after 1s
+  };
+
+  
   const fetchCart = useCallback(async () => {
     if (!cartId) return;
     setLoading(true);
@@ -97,8 +105,18 @@ export function useCart() {
   // --- Mutations (broadcast after successful server change) ---
   const add = useCallback(
     async (item: CartItemIn) => {
-      await API.post("/cart/items", item, withCartHeaders(cartId));
-      broadcastCartChange();
+      try {
+        await API.post("/cart/items", item, withCartHeaders(cartId));
+        broadcastCartChange();
+      } catch (err) {
+        const error = err as AxiosError<{ detail?: string }>;
+        
+        if (error.response?.data?.detail === "Not enough stock") {
+          triggerNoStock(); // 👈 flip the state
+        }
+        
+        return error.response?.data?.detail ?? "Something went wrong";
+      }
     },
     [cartId]
   );
@@ -143,6 +161,7 @@ export function useCart() {
     remove,
     clear,
     cartCount,
+    noStock
   };
 }
 
