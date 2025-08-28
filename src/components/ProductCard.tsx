@@ -7,20 +7,16 @@ import {useCart} from "@/hooks/useCart";
 
 export function ProductCard({
   product,
-  model,
-  onAdd,
   onQuickView,
 }: {
   product: ProductWithStock;                           // centralized type
-  model: Compat;
-  onAdd: (p: ProductWithStock, color: string, qty: number) => void;
   onQuickView: (p: ProductWithStock, color: string, qty: number) => void;
 }) {
   const [cardColor, setCardColor] = useState<string>(product.defaultColor);
   const [quantity, setQuantity] = useState<number>(1);
   const [added, setAdded] = useState<boolean>(false);
   const [liked, setLiked] = useState<boolean>(false);
-  const { add, cart } = useCart()
+  const { add } = useCart()
 
   const price = product.price_cents / 100;
   const imgSrc =
@@ -72,7 +68,7 @@ export function ProductCard({
     setAdded(true);
     setTimeout(() => setAdded(false), 900);
   };
-  console.log(cart)
+
   const handleQuickView = () => onQuickView(product, cardColor, quantity);
   
   return (
@@ -121,7 +117,7 @@ export function ProductCard({
             <div className="font-semibold leading-snug truncate">
               {product.name}
             </div>
-            <div className="text-xs text-gray-500 mt-0.5">{model}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{product.compat}</div>
           </div>
           <div className="text-lg font-bold shrink-0">{EUR(price)}</div>
         </div>

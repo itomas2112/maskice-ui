@@ -4,7 +4,7 @@ import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import API from "@/lib/api";
 import { Header } from "@/components/layout/Header";
-import {useCartCount, useShop} from "@/contexts/shop";
+import { useShop } from "@/contexts/shop";
 import {useCatalogFilters} from "@/hooks/useCatalogFilters"; // <-- add
 
 type Status = "PENDING" | "COMPLETED" | "CANCELED" | "FAILED" | "LOADING";
@@ -16,7 +16,7 @@ function SuccessContent() {
   const [status, setStatus] = useState<Status>("LOADING");
 
   // shop context
-  const { setCartOpen, setCart } = useShop(); // <-- add
+  const { setCartOpen } = useShop(); // <-- add
 
   // close the drawer on mount
   useEffect(() => {
@@ -27,10 +27,9 @@ function SuccessContent() {
   const clearedRef = useRef(false);
   useEffect(() => {
     if (status === "COMPLETED" && !clearedRef.current) {
-      setCart([]);               // updates context (and your persisted cart if you sync it there)
       clearedRef.current = true;
     }
-  }, [status, setCart]);
+  }, [status]);
 
   // polling
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,8 +70,6 @@ function SuccessContent() {
       type, setType, setPhone,
       availablePhones
     } = useCatalogFilters();
-    
-    const cartCount = useCartCount();
 
   const niceCode = orderId ? orderId.split("-")[0].toUpperCase() : "—";
 

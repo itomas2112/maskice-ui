@@ -1,50 +1,27 @@
 // src/app/page.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import API from "@/lib/api";
 import { Header } from "@/components/layout/Header";
 import { ProductCard } from "@/components/ProductCard";
-import { useShop, useCartCount } from "@/contexts/shop";
-import type { Compat, Product, BackendProduct } from "@/lib/types";
+import { useShop } from "@/contexts/shop";
+import type { Compat } from "@/lib/types";
 import { useCatalogFilters } from "@/hooks/useCatalogFilters";
-
-const EUR = (n: number) =>
-  new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(n);
-const BASE_PRICE = 3.0;
+import {Drawer} from "@/components/Drawer";
+import {PageFooter} from "@/components/layout/Footer";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="text-2xl font-bold">{children}</h2>;
 }
 
 export default function Page() {
-  const { addToCart, quick, setQuick, setCartOpen, normalize } = useShop();
-  const cartCount = useCartCount();
-  
-  const [width, setWidth] = useState<number>(0);
-
-  useEffect(() => {
-    const handleResize = () => setWidth(window.innerWidth);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const isMobile = width < 980;
-
-  const goTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const { quick, setQuick, setCartOpen } = useShop();
   
   const {
     model, setModel,
     type, setType,
-    phone, setPhone,
+    setPhone,
     filtered,
     availableModels,
-    availableTypes,
     availablePhones
   } = useCatalogFilters();
 
@@ -85,8 +62,6 @@ export default function Page() {
               <div key={p.id} className="max-w-[420px] w-full mx-auto">
                 <ProductCard
                   product={p}
-                  model={model}
-                  onAdd={(prod, color, qty) => addToCart(prod, color, qty)}
                   onQuickView={(prod, color) => setQuick({ product: prod, color })}
                 />
               </div>
@@ -96,41 +71,13 @@ export default function Page() {
             )}
           </div>
         </section>
+        <Drawer
+          quick={quick}
+          setQuick={setQuick}
+        />
       </main>
 
-      <footer className="border-t mt-16" id="contact">
-        <div className="max-w-7xl mx-auto px-4 py-10 grid md:grid-cols-3 gap-8">
-          <div>
-            <div className="flex items-center gap-2">
-              <a href="#top" onClick={goTop} className="flex items-center gap-2 select-none" aria-label="Na vrh stranice">
-                <span className="inline-flex h-6 w-6 rounded-full bg-gradient-to-tr from-zinc-900 to-zinc-700 ring-1 ring-black/10 shadow-sm" />
-                <span className="font-semibold tracking-tight">maskino</span>
-              </a>
-            </div>
-          </div>
-          <div id="faq">
-            <h4 className="font-semibold">Česta pitanja</h4>
-            <ul className="mt-3 text-sm text-gray-700 space-y-2">
-              <li>
-                <span className="font-medium">Zašto tako jeftino?</span> Kupujemo na veliko i držimo niske marže.
-              </li>
-              <li>
-                <span className="font-medium">Povrat?</span> Povrat novca u roku 30 dana, ako je proizvod oštećen.
-              </li>
-              <li>
-                <span className="font-medium">Dostava?</span> Unutar 24 sata narudžba će biti uručena u BoxNow. Unutar
-                0–48h u HR. Besplatno iznad 20€.
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold">Kontakt</h4>
-            <p className="mt-3 text-sm text-gray-700">Email: support@eurocase.example</p>
-            <p className="text-sm text-gray-700">Instagram: @eurocase.shop</p>
-            <p className="text-xs text-gray-500 mt-4">© {new Date().getFullYear()} Maske za mobitel — Sva prava pridržana.</p>
-          </div>
-        </div>
-      </footer>
+      <PageFooter />
     </div>
   );
 }

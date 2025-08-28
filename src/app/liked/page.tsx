@@ -7,13 +7,12 @@ import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/ProductCard";
 import { useShop } from "@/contexts/shop";
 import {useCatalogFilters} from "@/hooks/useCatalogFilters";
+import {Drawer} from "@/components/Drawer";
 
 export default function LikedPage() {
   const [likedIds, setLikedIds] = useState<string[]>([]);
-  const { addToCart, setQuick, cart, setCartOpen } = useShop();
+  const { quick, setQuick, setCartOpen } = useShop();
   const { products, loading } = useCatalogFilters()
-  
-  const cartCount = useMemo(() => cart.reduce((s, it) => s + it.qty, 0), [cart]);
 
   // load liked ids
   useEffect(() => {
@@ -73,14 +72,16 @@ export default function LikedPage() {
                 {/* ⬅️ NEW wrapper */}
                 <ProductCard
                   product={p}
-                  model={p.compat}
-                  onAdd={(prod, color, qty) => addToCart(prod, color, qty)}
-                  onQuickView={(prod, color, qty) => setQuick({ product: prod, color })}
+                  onQuickView={(prod, color) => setQuick({ product: prod, color })}
                 />
               </div>
             ))}
           </div>
         )}
+        <Drawer
+          quick={quick}
+          setQuick={setQuick}
+        />
       </main>
     </div>
   );

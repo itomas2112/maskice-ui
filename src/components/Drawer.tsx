@@ -5,6 +5,9 @@ import React, {useEffect, useMemo, useState} from "react";
 import { Button } from "@/components/ui/button";
 import type { ProductWithStock } from "@/lib/types";
 import {Check} from "lucide-react";
+import {useCart} from "@/hooks/useCart";
+import { EUR } from "@/lib/utils";
+import {  ArrowLeft } from "lucide-react";
 
 /* ---- QuickView local state (kept local to avoid changing context type) ---- */
 export type QuickState = { product: ProductWithStock; color: string } | null;
@@ -33,10 +36,10 @@ function DrawerShell({
         }`}
       >
         <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">{title}</h3>
           <button onClick={onClose} className="px-2 py-1 rounded-md border cursor-pointer">
-            Zatvori
+            <ArrowLeft className="w-15 h-6" />
           </button>
+          <h3 className="font-semibold">{title}</h3>
         </div>
         <div className="p-4 overflow-y-auto h-[calc(100%-56px)]">{children}</div>
       </aside>
@@ -48,24 +51,15 @@ function DrawerShell({
 export type DrawerProps = {
   quick: QuickState;
   setQuick: (q: QuickState) => void;
-  model: string;
-  safeAdd: (prod: ProductWithStock, color: string, wanted?: number) => void;
-  setCartOpen: (open: boolean) => void;
-  priceFormatter: (n: number) => string; // EUR()
-  basePrice: number;                      // BASE_PRICE
 };
 
 /* ---- QuickView Drawer ---- */
 export function Drawer({
   quick,
-  setQuick,
-  model,
-  safeAdd,
-  setCartOpen,
-  priceFormatter,
-  basePrice,
+  setQuick
 }: DrawerProps) {
 
+  const { add } = useCart()
   const [added, setAdded] = useState<boolean>(false)
   const [quantity, setQuantity] = useState<number>(1);
   const [cardColor, setCardColor] = useState<string>(() =>
@@ -91,7 +85,16 @@ export function Drawer({
   
   const open = !!quick;
   const title = quick ? quick.product.name : "Brzi pregled";
-
+  
+  function handleAdd() {
+    quick&&add({
+      product_id: quick.product.productIdByColor["id"],       // variant id
+      model: quick.product.compat,
+      color: quick.product.defaultColor,
+      qty: quantity, // optional; defaults to 1
+    })
+  }
+  console.log(quick)
   return (
     <DrawerShell open={open} onClose={() => setQuick(null)} title={title}>
       {quick && (
@@ -110,7 +113,7 @@ export function Drawer({
           </div>
 
           <div className="text-sm text-gray-600">
-            Model: <span className="font-medium">{model}</span> (zaključano)
+            Model: <span className="font-medium">{quick.product.compat}</span> (zaključano)
           </div>
           
           <div className="flex gap-3">
@@ -132,7 +135,7 @@ export function Drawer({
             <div className="w-28">
               <label className="block text-sm mb-1">Količina</label>
               <select
-                value={Math.min(quantity, maxSelectable)}
+                value={maxSelectable === 0 ? 0 : quantity}
                 onChange={(e) => setQuantity(Number(e.target.value))}
                 className="w-full px-3 py-2 rounded-lg border cursor-pointer"
                 onClick={(e) => e.stopPropagation()}
@@ -158,7 +161,7 @@ export function Drawer({
               variant={added ? "secondary" : "default"}
               className={`w-full transition-colors duration-300 cursor-pointer`}
               onClick={() => {
-                safeAdd(quick.product, quick.color, 1);
+                handleAdd();
                 setAdded(true);
                 setTimeout(() => setAdded(false), 900);
               }}
@@ -168,11 +171,8 @@ export function Drawer({
                   <Check className="w-4 h-4" /> Dodano
                 </span>
               ) : (
-                `Dodaj u košaricu • ${priceFormatter(basePrice)}`
+                `Dodaj u košaricu • ${EUR(quick.product.price_cents/100)}`
               )}
-            </Button>
-            <Button className="cursor-pointer" variant="outline" onClick={() => setQuick(null)}>
-              Zatvori
             </Button>
           </div>
         </div>

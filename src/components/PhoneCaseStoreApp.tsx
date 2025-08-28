@@ -1,14 +1,15 @@
 // src/components/PhoneCaseStoreApp.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { ProductCard } from "@/components/ProductCard";
-import { useShop, useCartCount } from "@/contexts/shop";
+import { useShop } from "@/contexts/shop";
 import type { Compat, ProductWithStock } from "@/lib/types";
 import { useCatalogFilters } from "@/hooks/useCatalogFilters";
 import { Drawer } from "@/components/Drawer";
 import { EUR } from "@/lib/utils";
+import {PageFooter} from "@/components/layout/Footer";
 
 const BASE_PRICE = 3.0;
 
@@ -16,13 +17,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="text-2xl font-bold">{children}</h2>;
 }
 
-function isObject(x: unknown): x is Record<string, unknown> {
-  return typeof x === "object" && x !== null;
-}
-
 export default function PhoneCaseStoreApp() {
-  const { addToCart, quick, setQuick, setCartOpen, cart, setCart } = useShop();
-  const cartCount = useCartCount();
+  const { quick, setQuick, setCartOpen } = useShop();
 
   const [width, setWidth] = useState<number>(0);
   useEffect(() => {
@@ -42,98 +38,11 @@ export default function PhoneCaseStoreApp() {
     availablePhones,
     products
   } = useCatalogFilters();
-
-  const { byGroupId, byVariantId, variantDefaultColor } = useMemo(() => {
-    const _byGroup: Record<string, ProductWithStock> = {};
-    const _byVar: Record<string, ProductWithStock> = {};
-    const _varDefault: Record<string, string> = {};
-    for (const p of products as ProductWithStock[]) {
-      _byGroup[p.id] = p;
-      for (const c of p.colors) {
-        const vid = p.productIdByColor[c];
-        if (vid) {
-          _byVar[vid] = p;
-          _varDefault[vid] = p.defaultColor ?? c;
-        }
-      }
-    }
-    return { byGroupId: _byGroup, byVariantId: _byVar, variantDefaultColor: _varDefault };
-  }, [products]);
-
-  // ===== Cart sanitizer that only removes/clamps when real stock info exists =====
-  useEffect(() => {
-    if (!Array.isArray(cart) || !products?.length) return;
-
-    let changed = false;
-
-    const next = (cart as unknown[]).flatMap((raw) => {
-      if (!isObject(raw)) { changed = true; return []; }
-      const line = raw as {
-        id?: string;
-        productId?: string;
-        product?: ProductWithStock | { id?: string } | null;
-        color?: string;
-        qty: number;
-        [key: string]: unknown;
-      };
-
-      // resolve product from bundled or variant id or group id
-      let product: ProductWithStock | undefined;
-
-      if (line.product && isObject(line.product) && typeof (line.product as { id?: string }).id === "string") {
-        const pid = (line.product as { id?: string }).id;
-        if (pid) product = byGroupId[pid];
-      }
-      if (!product && typeof line.productId === "string") {
-        product = byVariantId[line.productId];
-      }
-      if (!product && typeof line.id === "string") {
-        product = byGroupId[line.id];
-      }
-
-      // normalize color if missing
-      let color: string | undefined = typeof line.color === "string" ? line.color : undefined;
-      if (!color && line.productId && variantDefaultColor[line.productId]) {
-        color = variantDefaultColor[line.productId];
-        changed = true;
-        return [{ ...line, color }];
-      }
-
-      if (!product || !color || typeof line.qty !== "number") {
-        return [line];
-      }
-
-      const lineWithProduct = line.product ? line : { ...line, product };
-      if (!line.product) changed = true;
-
-      const hasStockInfo =
-        product.quantityByColor && Object.keys(product.quantityByColor).length > 0;
-
-      const rawLeft = hasStockInfo ? (product.quantityByColor![color] ?? 0) : 10;
-      const left = Math.max(0, Math.min(10, rawLeft));
-
-      if (hasStockInfo) {
-        if (left <= 0) { changed = true; return []; }
-        if (lineWithProduct.qty > left) { changed = true; return [{ ...lineWithProduct, qty: left }]; }
-      }
-
-      return [lineWithProduct];
-    });
-
-    if (changed) setCart(next as typeof cart);
-  }, [products, cart, setCart, byGroupId, byVariantId, variantDefaultColor]);
-
+  
   const getMaxQty = (p: ProductWithStock, color: string) => {
     const hasStockInfo = p.quantityByColor && Object.keys(p.quantityByColor).length > 0;
     const rawLeft = hasStockInfo ? (p.quantityByColor?.[color] ?? 0) : 10;
     return Math.max(0, Math.min(10, rawLeft));
-  };
-
-  const safeAdd = (prod: ProductWithStock, color: string, wanted = 1) => {
-    const max = getMaxQty(prod, color);
-    const qty = Math.min(wanted, max);
-    if (qty <= 0) return;
-    addToCart(prod, color, qty);
   };
 
   return (
@@ -202,8 +111,6 @@ export default function PhoneCaseStoreApp() {
               <div key={p.id} className="max-w-[420px] w-full mx-auto">
                 <ProductCard
                   product={p}
-                  model={model}
-                  onAdd={(prod, color, qty = 1) => safeAdd(prod, color, qty)}
                   onQuickView={(prod, color) => setQuick({ product: prod, color })}
                 />
               </div>
@@ -215,49 +122,12 @@ export default function PhoneCaseStoreApp() {
         </section>
       </main>
 
-      <footer className="border-t mt-16" id="contact">
-        <div className="max-w-7xl mx-auto px-4 py-10 grid md:grid-cols-3 gap-8">
-          <div>
-            <div className="flex items-center gap-2">
-              <a href="#top" className="flex items-center gap-2 select-none" aria-label="Na vrh stranice">
-                <span className="inline-flex h-6 w-6 rounded-full bg-gradient-to-tr from-zinc-900 to-zinc-700 ring-1 ring-black/10 shadow-sm" />
-                <span className="font-semibold tracking-tight">maskino</span>
-              </a>
-            </div>
-          </div>
-          <div id="faq">
-            <h4 className="font-semibold">Česta pitanja</h4>
-            <ul className="mt-3 text-sm text-gray-700 space-y-2">
-              <li>
-                <span className="font-medium">Zašto tako jeftino?</span> Kupujemo na veliko i držimo niske marže.
-              </li>
-              <li>
-                <span className="font-medium">Povrat?</span> Povrat novca u roku 30 dana, ako je proizvod oštećen.
-              </li>
-              <li>
-                <span className="font-medium">Dostava?</span> Unutar 24 sata narudžba će biti uručena u BoxNow. Unutar
-                0–48h u HR. Besplatno iznad 20€.
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold">Kontakt</h4>
-            <p className="mt-3 text-sm text-gray-700">Email: support@eurocase.example</p>
-            <p className="text-sm text-gray-700">Instagram: @eurocase.shop</p>
-            <p className="text-xs text-gray-500 mt-4">© {new Date().getFullYear()} Maske za mobitel — Sva prava pridržana.</p>
-          </div>
-        </div>
-      </footer>
+      <PageFooter />
 
       {/* Brzi pregled — no 'any' casts needed */}
       <Drawer
         quick={quick}
         setQuick={setQuick}
-        model={model}
-        safeAdd={safeAdd}
-        setCartOpen={setCartOpen}
-        priceFormatter={EUR}
-        basePrice={BASE_PRICE}
       />
     </div>
   );
