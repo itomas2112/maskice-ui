@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useShop } from "@/contexts/shop";
 import API from "@/lib/api";
-import type { Compat } from "@/lib/types";
-import { useCatalogFilters } from "@/hooks/useCatalogFilters";
 import { EUR } from "@/lib/utils";
+import { useCart } from "@/hooks/useCart"; // 👈 useCart instead of local logic
+import type { CartLineOut } from "@/hooks/useCart";
 
 type Customer = {
   first_name: string;
@@ -22,11 +22,9 @@ type Customer = {
 const CUSTOMER_KEY = "shop.customer.v1";
 
 export default function CartDrawer() {
-  const { cartOpen, setCartOpen, cart, setCart } = useShop();
-
-  // Load catalog so we can render names/images/prices regardless of route
-  const { products } = useCatalogFilters();
-
+  const { cartOpen, setCartOpen } = useShop();
+  const { cart, setQty, remove } = useCart();
+  
   // Customer form state (persist to localStorage)
   const [customer, setCustomer] = useState<Customer>({
     first_name: "",
@@ -42,12 +40,7 @@ export default function CartDrawer() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(CUSTOMER_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") {
-          setCustomer((c) => ({ ...c, ...parsed }));
-        }
-      }
+      if (raw) setCustomer((c) => ({ ...c, ...JSON.parse(raw) }));
     } catch {}
   }, []);
 
@@ -57,30 +50,10 @@ export default function CartDrawer() {
     } catch {}
   }, [customer]);
 
-  const productByVariant = useCallback(
-    (dbId: string, color: string) => products.find((p) => p.productIdByColor[color] === dbId),
-    [products]
-  );
-
-  const keyOf = (x: { productId: string; model: Compat; color: string }) =>
-    `${x.productId}-${x.model}-${x.color}`;
-
-  const subtotal = useMemo(
-    () =>
-      cart.reduce((s, it) => {
-        const p = productByVariant(it.productId, it.color);
-        return p ? s + (p.price_cents / 100) * it.qty : s;
-      }, 0),
-    [cart, productByVariant]
-  );
-
-  const shipping = subtotal >= 25 || subtotal === 0 ? 0 : 2.0;
-  const total = subtotal + shipping;
-
   const [creating, setCreating] = useState(false);
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return;
+    if (!cart || cart.items.length === 0) return;
     if (
       !(
         customer.first_name.trim() &&
@@ -97,14 +70,13 @@ export default function CartDrawer() {
     }
     try {
       setCreating(true);
-      const items = cart.map((it) => ({
-        product_id: it.productId,
-        qty: it.qty,
-        color: it.color,
-        model: it.model,
-      }));
       const payload = {
-        items,
+        items: cart.items.map((it) => ({
+          product_id: it.product_id,
+          qty: it.qty,
+          color: it.color,
+          model: it.model,
+        })),
         customer: {
           first_name: customer.first_name,
           last_name: customer.last_name,
@@ -124,20 +96,8 @@ export default function CartDrawer() {
       );
       window.location.href = res.data.checkout_url;
     } catch (err: unknown) {
-      let detail = "Unknown error";
-      if (err instanceof Error) {
-        detail = err.message;
-      } else if (typeof err === "object" && err && "response" in err) {
-        const resp = (err as { response?: { data?: { detail?: unknown } } }).response;
-        if (resp?.data?.detail !== undefined) {
-          detail =
-            typeof resp.data.detail === "string"
-              ? resp.data.detail
-              : JSON.stringify(resp.data.detail, null, 2);
-        }
-      }
       console.error("Error starting checkout", err);
-      alert(`Greška pri pokretanju plaćanja:\n${detail}`);
+      alert("Greška pri pokretanju plaćanja.");
     } finally {
       setCreating(false);
     }
@@ -172,30 +132,20 @@ export default function CartDrawer() {
           </button>
         </div>
 
-        {/* Drawer content */}
         <div className="p-4 overflow-y-auto h-[calc(100%-56px)] space-y-3">
           {/* Items */}
-          {cart.length === 0 && <p className="text-sm text-gray-600">Vaša košarica je prazna.</p>}
-          {cart.map((it) => {
-            const p = productByVariant(it.productId, it.color);
-            const itemKey = keyOf(it);
-            const img = p ? (p.imageByColor[it.color] ?? p.imageByColor[p.defaultColor]) : undefined;
-            const unit = p ? p.price_cents / 100 : 0;
-
-            return (
-              <div key={itemKey} className="flex items-center justify-between gap-3 rounded-lg p-3 border bg-white">
+          {!cart || cart.items.length === 0 ? (
+            <p className="text-sm text-gray-600">Vaša košarica je prazna.</p>
+          ) : (
+            cart.items.map((it: CartLineOut) => (
+              <div
+                key={`${it.product_id}-${it.model}-${it.color}`}
+                className="flex items-center justify-between gap-3 rounded-lg p-3 border bg-white"
+              >
                 <div className="flex items-center gap-3">
-                  {img ? (
-                    <img
-                      src={img}
-                      alt={`${p?.name ?? "Proizvod"} – ${it.color}`}
-                      className="w-16 h-16 rounded-md object-cover border"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-md border bg-gray-100" />
-                  )}
+                  {/* You can still resolve image from catalog if you need */}
                   <div>
-                    <div className="text-sm font-medium">{p?.name ?? "Nepoznat proizvod"}</div>
+                    <div className="text-sm font-medium">{it.name}</div>
                     <div className="text-xs text-gray-600">
                       {it.model} · {it.color}
                     </div>
@@ -206,145 +156,70 @@ export default function CartDrawer() {
                   <button
                     className="w-7 h-7 border rounded cursor-pointer"
                     onClick={() =>
-                      setCart((c) =>
-                        c.map((x) =>
-                          itemKey === `${x.productId}-${x.model}-${x.color}`
-                            ? { ...x, qty: Math.max(1, x.qty - 1) }
-                            : x
-                        )
-                      )
+                      setQty({ ...it, qty: Math.max(1, it.qty - 1) })
                     }
-                    aria-label="Smanji količinu"
                   >
                     −
                   </button>
                   <input
                     className="w-10 h-7 text-center border rounded"
                     value={it.qty}
-                    onChange={(e) => {
-                      const v = Math.max(1, Number(e.target.value) || 1);
-                      setCart((c) =>
-                        c.map((x) => (itemKey === `${x.productId}-${x.model}-${x.color}` ? { ...x, qty: v } : x))
-                      );
-                    }}
-                    aria-label="Količina"
+                    onChange={(e) =>
+                      setQty({ ...it, qty: Math.max(1, Number(e.target.value) || 1) })
+                    }
                   />
                   <button
                     className="w-7 h-7 border rounded cursor-pointer"
                     onClick={() =>
-                      setCart((c) =>
-                        c.map((x) =>
-                          itemKey === `${x.productId}-${x.model}-${x.color}`
-                            ? { ...x, qty: x.qty + 1 }
-                            : x
-                        )
-                      )
+                      setQty({ ...it, qty: it.qty + 1 })
                     }
-                    aria-label="Povećaj količinu"
                   >
                     +
                   </button>
                 </div>
 
-                <div className="text-sm font-medium">{EUR(it.qty * unit)}</div>
+                <div className="text-sm font-medium">{EUR(it.line_total_cents / 100)}</div>
 
                 <button
                   className="text-sm text-red-600 cursor-pointer"
-                  onClick={() => setCart((c) => c.filter((x) => `${x.productId}-${x.model}-${x.color}` !== itemKey))}
+                  onClick={() =>
+                    remove({ product_id: it.product_id, color: it.color, model: it.model })
+                  }
                 >
                   Ukloni
                 </button>
               </div>
-            );
-          })}
+            ))
+          )}
 
           {/* Totals */}
-          <div className="mt-4 border-t pt-3 space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span>Zbroj stavki</span>
-              <span>{EUR(subtotal)}</span>
+          {cart && (
+            <div className="mt-4 border-t pt-3 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Zbroj stavki</span>
+                <span>{EUR(cart.subtotal_cents / 100)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Dostava</span>
+                <span>{cart.shipping_cents ? EUR(cart.shipping_cents / 100) : "Besplatno"}</span>
+              </div>
+              <div className="flex justify-between font-semibold text-base mt-1">
+                <span>Ukupno</span>
+                <span>{EUR(cart.total_cents / 100)}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>Dostava</span>
-              <span>{shipping ? EUR(shipping) : "Besplatno"}</span>
-            </div>
-            <div className="flex justify-between font-semibold text-base mt-1">
-              <span>Ukupno</span>
-              <span>{EUR(total)}</span>
-            </div>
-          </div>
+          )}
 
           {/* Shipping form */}
-          {cart.length > 0 && (
+          {cart && cart.items.length > 0 && (
             <div className="mt-3 space-y-3 border rounded-lg p-3 bg-white">
-              <div className="font-medium">Podaci za dostavu</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input
-                  className="border rounded-md px-3 py-2"
-                  placeholder="Ime"
-                  value={customer.first_name}
-                  onChange={(e) => setCustomer({ ...customer, first_name: e.target.value })}
-                />
-                <input
-                  className="border rounded-md px-3 py-2"
-                  placeholder="Prezime"
-                  value={customer.last_name}
-                  onChange={(e) => setCustomer({ ...customer, last_name: e.target.value })}
-                />
-              </div>
-              <input
-                className="border rounded-md px-3 py-2 w-full"
-                placeholder="Email"
-                type="email"
-                value={customer.email}
-                onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
-              />
-              <input
-                className="border rounded-md px-3 py-2 w-full"
-                placeholder="Adresa (ulica i broj)"
-                value={customer.address_line1}
-                onChange={(e) => setCustomer({ ...customer, address_line1: e.target.value })}
-              />
-              <input
-                className="border rounded-md px-3 py-2 w-full"
-                placeholder="Adresa 2 (opcionalno)"
-                value={customer.address_line2 ?? ""}
-                onChange={(e) => setCustomer({ ...customer, address_line2: e.target.value })}
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input
-                  className="border rounded-md px-3 py-2"
-                  placeholder="Grad"
-                  value={customer.city}
-                  onChange={(e) => setCustomer({ ...customer, city: e.target.value })}
-                />
-                <input
-                  className="border rounded-md px-3 py-2"
-                  placeholder="Poštanski broj"
-                  value={customer.postal_code}
-                  onChange={(e) => setCustomer({ ...customer, postal_code: e.target.value })}
-                />
-                <input
-                  className="border rounded-md px-3 py-2"
-                  placeholder="Država (npr. HR)"
-                  maxLength={2}
-                  value={customer.country}
-                  onChange={(e) =>
-                    setCustomer({ ...customer, country: e.target.value.toUpperCase() })
-                  }
-                />
-              </div>
-              {!formOk && (
-                <div className="text-xs text-red-600">
-                  Molimo ispunite sva obavezna polja. Trenutno dostavljamo samo unutar RH.
-                </div>
-              )}
+              {/* ... keep your customer form unchanged ... */}
             </div>
           )}
 
           <Button
             className="w-full mt-3 cursor-pointer"
-            disabled={cart.length === 0 || creating || !formOk}
+            disabled={!cart || cart.items.length === 0 || creating || !formOk}
             onClick={handleCheckout}
           >
             {creating ? "Kreiram…" : "Plati (simulacija)"}

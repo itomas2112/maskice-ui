@@ -20,7 +20,7 @@ export function ProductCard({
   const [quantity, setQuantity] = useState<number>(1);
   const [added, setAdded] = useState<boolean>(false);
   const [liked, setLiked] = useState<boolean>(false);
-  const { add } = useCart()
+  const { add, cart } = useCart()
 
   const price = product.price_cents / 100;
   const imgSrc =
@@ -72,9 +72,9 @@ export function ProductCard({
     setAdded(true);
     setTimeout(() => setAdded(false), 900);
   };
-
+  console.log(cart)
   const handleQuickView = () => onQuickView(product, cardColor, quantity);
-
+  
   return (
     <div
       className="

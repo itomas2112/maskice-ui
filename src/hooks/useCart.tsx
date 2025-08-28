@@ -4,25 +4,31 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import API from "@/lib/api"; // your axios instance
 
 // ---------- Types (match your backend) ----------
+// ---------- Types (match new backend) ----------
 export type CartItemIn = {
   product_id: string;
   color: string;
-  model: "iPhone 16" | "iPhone 16 Pro"; // adjust if you add more
+  model: string;   // no more Literal, backend accepts any string
   qty: number;
 };
 
-export type QuoteItem = CartItemIn & {
+export type CartLineOut = {
+  product_id: string;
+  color: string;
+  model: string;
+  qty: number;
   name: string;
   unit_price_cents: number;
   line_total_cents: number;
 };
 
-export type QuoteOut = {
-  items: QuoteItem[];
-  subtotal_cents: number;
-  shipping_cents: number;
-  total_cents: number;
+export type CartSummaryOut = {
+  items: CartLineOut[];
+  subtotal_cents: number;   // products total
+  shipping_cents: number;   // delivery
+  total_cents: number;      // subtotal + shipping
 };
+
 
 // ---------- cart_id cookie ----------
 function getOrCreateCartId(): string {
@@ -47,16 +53,15 @@ function withCartHeaders(cartId: string) {
 // ---------- Hook ----------
 export function useCart() {
   const cartId = useMemo(getOrCreateCartId, []);
-  const [data, setData] = useState<QuoteOut | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [data, setData] = useState<CartSummaryOut | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCart = useCallback(async () => {
     if (!cartId) return;
     setLoading(true);
-    setError(null);
     try {
-      const res = await API.get<QuoteOut>("/cart", withCartHeaders(cartId));
+      const res = await API.get<CartSummaryOut>("/cart", withCartHeaders(cartId));
       setData(res.data);
     } catch (e: any) {
       setError(e?.response?.data?.detail || e?.message || "Failed to load cart");
@@ -65,15 +70,12 @@ export function useCart() {
     }
   }, [cartId]);
 
-  useEffect(() => {
-    fetchCart();
-  }, [fetchCart]);
+  useEffect(() => { fetchCart(); }, [fetchCart]);
 
-  // --- Mutations (simple: call backend, then refresh) ---
+  // --- Mutations ---
   const add = useCallback(
-    async (item: Omit<CartItemIn, "qty"> & { qty?: number }) => {
-      const body = { action: "add", ...item, qty: item.qty ?? 1 };
-      await API.patch<QuoteOut>("/cart/items", body, withCartHeaders(cartId));
+    async (item: CartItemIn) => {
+      await API.post("/cart/items", item, withCartHeaders(cartId));
       await fetchCart();
     },
     [cartId, fetchCart]
@@ -81,8 +83,7 @@ export function useCart() {
 
   const setQty = useCallback(
     async (item: CartItemIn) => {
-      const body = { action: "set", ...item };
-      await API.patch<QuoteOut>("/cart/items", body, withCartHeaders(cartId));
+      await API.patch("/cart/items", item, withCartHeaders(cartId));
       await fetchCart();
     },
     [cartId, fetchCart]
@@ -90,8 +91,10 @@ export function useCart() {
 
   const remove = useCallback(
     async (item: Omit<CartItemIn, "qty">) => {
-      const body = { action: "remove", ...item, qty: 0 };
-      await API.patch<QuoteOut>("/cart/items", body, withCartHeaders(cartId));
+      await API.delete(
+        `/cart/items/${item.product_id}/${item.color}/${item.model}`,
+        { ...withCartHeaders(cartId) } // wrap as config object
+      );
       await fetchCart();
     },
     [cartId, fetchCart]
@@ -111,8 +114,7 @@ export function useCart() {
     setQty,
     remove,
     clear,
-    // convenience:
-    itemCount:
-      data?.items?.reduce((acc, it) => acc + (Number.isFinite(it.qty) ? it.qty : 0), 0) ?? 0,
+    itemCount: data?.items?.reduce((acc, it) => acc + it.qty, 0) ?? 0,
   };
 }
+
