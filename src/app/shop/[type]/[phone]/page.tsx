@@ -52,7 +52,6 @@ export default function Page() {
     <div id="top" className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50">
       {/* Zaglavlje */}
       <Header
-        cartCount={cartCount}
         setCartOpen={setCartOpen}
         setType={setType}
         availablePhones={availablePhones}

@@ -43,7 +43,6 @@ export default function LikedPage() {
   return (
     <div className="min-h-screen bg-white">
       <Header
-        cartCount={cartCount}
         setCartOpen={setCartOpen}
         setType={setType}
         availablePhones={availablePhones}

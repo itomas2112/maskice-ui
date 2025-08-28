@@ -140,7 +140,6 @@ export default function PhoneCaseStoreApp() {
     <div id="top" className="min-h-screen text-gray-900 bg-gradient-to-br from-amber-50 via-white to-emerald-50">
       {/* Header */}
       <Header
-        cartCount={cartCount}
         setCartOpen={setCartOpen}
         setType={setType}
         availablePhones={availablePhones}
