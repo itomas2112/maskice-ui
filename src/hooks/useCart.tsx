@@ -54,6 +54,16 @@ function withCartHeaders(cartId: string) {
 const CART_EVENT = "cart:changed";
 const broadcastCartChange = () => window.dispatchEvent(new Event(CART_EVENT));
 
+function extractErrMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null) {
+    const resp = (e as { response?: { data?: { detail?: unknown } } }).response;
+    const detail = resp?.data?.detail;
+    if (typeof detail === "string") return detail;
+  }
+  return "Failed to load cart";
+}
+
 // ---------- Hook ----------
 export function useCart() {
   const cartId = useMemo(getOrCreateCartId, []);
@@ -67,8 +77,8 @@ export function useCart() {
     try {
       const res = await API.get<CartSummaryOut>("/cart", withCartHeaders(cartId));
       setData(res.data);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.message || "Failed to load cart");
+    } catch (e: unknown) {
+      setError(extractErrMessage(e));
     } finally {
       setLoading(false);
     }
