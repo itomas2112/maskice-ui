@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import API from "@/lib/api";
 import { Header } from "@/components/layout/Header";
 import { useShop } from "@/contexts/shop";
-import {useCatalogFilters} from "@/hooks/useCatalogFilters"; // <-- add
+import {useCatalogFilters} from "@/hooks/useCatalogFilters";
+import {useCart} from "@/hooks/useCart"; // <-- add
 
 type Status = "PENDING" | "COMPLETED" | "CANCELED" | "FAILED" | "LOADING";
 
@@ -17,10 +18,12 @@ function SuccessContent() {
 
   // shop context
   const { setCartOpen } = useShop(); // <-- add
+  const { clear } = useCart()
 
   // close the drawer on mount
   useEffect(() => {
     setCartOpen(false);
+    clear();
   }, [setCartOpen]);
 
   // clear cart once when completed
