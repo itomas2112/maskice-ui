@@ -1,8 +1,10 @@
 // src/hooks/useCatalogFilters.ts
 import { useEffect, useMemo, useState } from "react";
-import type { BackendProduct, Compat, Product, ProductWithStock, QuantityByColor } from "@/lib/types";
+import type { BackendProduct, Compat, ProductWithStock, QuantityByColor } from "@/lib/types";
 import API from "@/lib/api";
 import { useShop } from "@/contexts/shop";
+import { useParams } from "next/navigation";
+import { slugToType, slugToPhone } from "@/lib/slug"; // keep as-is if you’re using slugs
 
 // ——— helpers without using `any`
 function getStringFromKeys(obj: Record<string, unknown>, keys: string[]): string | undefined {
@@ -22,93 +24,111 @@ function getNumberLikeFromKeys(obj: Record<string, unknown>, keys: string[], fal
 }
 
 export function useCatalogFilters() {
-  const [model, setModel] = useState<Compat>("iPhone 16");
+  const [availableModels, setAvailableModels] = useState<Compat[]>([]);
+  const [model, setModel] = useState<Compat>("iPhone 16"); // will be overridden to default available
   const [type, setType] = useState<string | undefined>(undefined);
   const [phone, setPhone] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState<boolean>(true);
   const [products, setProducts] = useState<ProductWithStock[]>([]);
   const { normalize } = useShop();
+  const params = useParams() as { type?: string; phone?: string } | null;
 
+  // Load + normalize products
   useEffect(() => {
-    API.get<BackendProduct[]>("/products")
-      .then((res) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await API.get<BackendProduct[]>("/products");
         const rows = res.data ?? [];
-  
+
         const normalized = rows
           .map((row): ProductWithStock | null => {
             const base = normalize(row);
             if (!base) return null;
-  
+
             const quantityByColor: QuantityByColor = {};
             const variants = (row as { variants?: unknown[] }).variants ?? [];
             for (const vv of variants) {
               if (typeof vv !== "object" || vv === null) continue;
               const v = vv as Record<string, unknown>;
-  
-              // Be lenient with backend field names
+
               const colorKey = getStringFromKeys(v, ["colors", "color", "colour", "Color"]);
               if (!colorKey) continue;
-  
+
               const q = getNumberLikeFromKeys(v, ["quantity", "qty", "stok", "Quantity"], 0);
               quantityByColor[colorKey] = q;
             }
-  
-            // Always return ProductWithStock
+
             return { ...base, quantityByColor };
           })
           .filter((x): x is ProductWithStock => x !== null);
-  
-        setProducts(normalized);
-        setLoading(false);
-      })
-      .catch(() => {
+
+        if (!cancelled) setProducts(normalized);
+      } catch {
         console.error("Error loading products");
-        setLoading(false);
-      });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [normalize]);
 
-  const availableModels = useMemo(() => {
-    const set = new Set<Compat>();
-    for (const p of products) set.add(p.compat);
-    return Array.from(set);
+  // Sync from URL params
+  useEffect(() => {
+    if (!params) return;
+    if (params.type) setType(slugToType(params.type));
+    if (params.phone) setPhone(slugToPhone(params.phone));
+  }, [params, setType, setPhone]);
+
+  // Available Types (unique)
+  const availableTypes = useMemo(() => {
+    return Array.from(new Set(products.map((p) => p.type).filter(Boolean)));
   }, [products]);
 
-  const availableTypes = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of products) if (p.compat === model && p.type) set.add(p.type);
-    return Array.from(set);
-  }, [products, model]);
-
+  // Available Phones (unique)
   const availablePhones = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of products) if (p.compat === model && p.phone) set.add(p.phone);
-    return Array.from(set);
-  }, [products, model]);
+    // If you want phones constrained by selected type, uncomment next line:
+    // const base = type ? products.filter(p => p.type?.toLowerCase() === type.toLowerCase()) : products;
+    const base = products;
+    return Array.from(new Set(base.map((p) => p.phone).filter(Boolean)));
+  }, [products /*, type*/]);
 
-  const filtered = useMemo(
-    () =>
-      products.filter(
-        (p) =>
-          p.compat === model &&
-          (!type || p.type === type) &&
-          (!phone || p.phone === phone)
-      ),
-    [products, model, type, phone]
-  );
-
+  // Recompute available models whenever phone or products change
   useEffect(() => {
-    if (availableModels.length && !availableModels.includes(model)) {
-      setModel(availableModels[0]);
+    const base = phone
+      ? products.filter((prod) => prod.phone && phone && prod.phone.toLowerCase() === phone.toLowerCase())
+      : products;
+
+    const allModels = Array.from(new Set(base.map((p) => p.compat).filter(Boolean)));
+
+    setAvailableModels(allModels);
+
+    // ✅ Important: only set model when there is at least one model
+    if (allModels.length) {
+      // If current model is not in the list, or nothing selected yet, pick first
+      if (!model || !allModels.includes(model)) {
+        setModel(allModels[0]);
+      }
     }
-  }, [availableModels, model]);
+    // If there are no models for current selection, DO NOT set model (avoid undefined)
+  }, [phone, products]); // model is intentionally not a dependency to avoid loops
 
-  useEffect(() => {
-    if (type && !availableTypes.includes(type)) setType(undefined);
-  }, [availableTypes, type]);
+  // Filtered list (safe against undefineds during load)
+  const filtered = useMemo(() => {
+    const m = model ? String(model).toLowerCase() : undefined;
+    const t = type ? type.toLowerCase() : undefined;
+    const ph = phone ? phone.toLowerCase() : undefined;
 
-  useEffect(() => {
-    if (phone && !availablePhones.includes(phone)) setPhone(undefined);
-  }, [availablePhones, phone]);
+    return products.filter((p) => {
+      const okModel = m ? String(p.compat).toLowerCase() === m : true;
+      const okType = t ? (p.type ? p.type.toLowerCase() === t : false) : true;
+      const okPhone = ph ? (p.phone ? p.phone.toLowerCase() === ph : false) : true;
+      return okModel && okType && okPhone;
+    });
+  }, [products, model, type, phone]);
 
   return {
     model, setModel,

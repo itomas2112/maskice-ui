@@ -24,7 +24,7 @@ const CART_KEY = "shop.cart.v1";
 const CARTOPEN_KEY = "shop.cartOpen.v1";
 
 // If you add more models later, extend this list.
-const COMPAT_VALUES: readonly Compat[] = ["iPhone 16", "iPhone 16 Pro"] as const;
+const COMPAT_VALUES: readonly Compat[] = []; // or any list you want
 
 function isCompat(v: unknown): v is Compat {
   return typeof v === "string" && (COMPAT_VALUES as readonly string[]).includes(v);
@@ -46,7 +46,6 @@ const fixPublicPath = (p: string) => p.replace(/^\/public(\/|$)/, "/");
 
 const normalize = (bp: BackendProduct): Product | null => {
   const compat = bp.compat as Compat;
-  if (!["iPhone 16", "iPhone 16 Pro"].includes(bp.compat)) return null;
 
   const imageByColor: Record<string, string> = {};
   const productIdByColor: Record<string, string> = {};

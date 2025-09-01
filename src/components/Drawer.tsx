@@ -94,7 +94,7 @@ export function Drawer({
       qty: quantity, // optional; defaults to 1
     })
   }
-  console.log(quick)
+
   return (
     <DrawerShell open={open} onClose={() => setQuick(null)} title={title}>
       {quick && (

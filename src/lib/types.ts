@@ -1,4 +1,4 @@
-export type Compat = "iPhone 16" | "iPhone 16 Pro";
+export type Compat = string;
 
 export type Product = {
   id: string;

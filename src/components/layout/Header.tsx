@@ -67,6 +67,7 @@ export function Header({
     setType(t);
     setMobileStep("phones");
   };
+  
 
   const choosePhone = (ph: string) => {
     type && router.push(`/shop/${typeToSlug(type)}/${phoneToSlug(ph)}`);
