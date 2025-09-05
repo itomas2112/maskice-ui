@@ -39,6 +39,20 @@ export function Header({
 
   useEffect(() => setMounted(true), []);
   const router = useRouter();
+  
+  const flyoutRef = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showPhones) return;
+    function handleClick(e: MouseEvent) {
+      if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
+        setShowPhones(false);
+        setIntermType("");
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showPhones]);
+
 
   // lock page scroll when mobile menu is open
   useEffect(() => {
@@ -79,6 +93,17 @@ export function Header({
     setMobileStep("root");
   };
 
+  // --- UI helper for active state on desktop glass pills ---
+  const selectedType = (intermType || type) as "Case" | "Glass" | undefined;
+  const glassBase =
+    "inline-flex items-center px-4 py-2 rounded-full border transition " +
+    "border-white/30 bg-white/10 backdrop-blur supports-[backdrop-filter]:bg-white/10 " +
+    "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.35)] " +
+    "hover:bg-white/20 hover:shadow-lg hover:shadow-black/10 hover:ring-1 hover:ring-black/10 " +
+    "active:scale-[0.98] cursor-pointer select-none";
+  const glassActive =
+    "bg-white/40 text-gray-900 border-white/50 ring-2 ring-black/10 font-semibold";
+  console.log(type)
   return (
     <header className="relative sticky top-0 z-40 border-b border-black/5 bg-white/60 backdrop-blur">
       {/* Top bar */}
@@ -98,31 +123,44 @@ export function Header({
           <span className="inline-flex h-6 w-6 rounded-full bg-gradient-to-tr from-zinc-900 to-zinc-700 ring-1 ring-black/10 shadow-sm" />
           <span className="font-semibold tracking-tight">maskino</span>
         </Link>
-
-        {/* Center nav */}
-        <nav className="hidden sm:flex justify-self-center items-center gap-6 sm:gap-8 text-sm sm:text-[0.95rem]">
-          <span
-            className="cursor-pointer font-medium hover:underline underline-offset-4 text-gray-700"
+        
+        {/* Center nav (desktop only) */}
+        <nav
+          className="hidden sm:flex justify-self-center items-center gap-3"
+          aria-label="Kategorije"
+        >
+          <button
+            type="button"
             onClick={() => desktopPickType("Case", true)}
+            className={[
+              glassBase,
+              selectedType === "Case" ? glassActive : "text-gray-700"
+            ].join(" ")}
           >
             Maske
-          </span>
-          <span
-            className="cursor-pointer font-medium hover:underline underline-offset-4 text-gray-700"
+          </button>
+        
+          <button
+            type="button"
             onClick={() => desktopPickType("Glass", true)}
+            className={[
+              glassBase,
+              selectedType === "Glass" ? glassActive : "text-gray-700"
+            ].join(" ")}
           >
             Zaštitno staklo
-          </span>
+          </button>
         </nav>
+
 
         {/* Right */}
         <div className="flex items-center gap-2 justify-self-end">
           <Link href="/liked" aria-label="Favorite products">
             <Button
               variant="outline"
-              className="relative cursor-pointer rounded-full h-9 px-3 shadow-sm hover:shadow-md transition hover:bg-black/5 active:scale-[0.98] group"
+              className="relative cursor-pointer rounded-full h-11 px-4 shadow-sm hover:shadow-md transition hover:bg-black/5 active:scale-[0.98] group"
             >
-              <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
+              <Heart className="h-6 w-6 transition-transform group-hover:scale-110" />
             </Button>
           </Link>
 
@@ -130,7 +168,7 @@ export function Header({
             <Button
               variant="outline"
               onClick={() => setCartOpen(true)}
-              className="relative cursor-pointer rounded-full h-9 pl-6 pr-7 min-w-[15vh] shadow-sm hover:shadow-md transition hover:bg-black/5 active:scale-[0.98] group"
+              className="relative cursor-pointer rounded-full h-11 pl-6 pr-7 min-w-[15vh] shadow-sm hover:shadow-md transition hover:bg-black/5 active:scale-[0.98] group"
             >
               <ShoppingCart className="mr-2 h-5 w-5 transition-transform group-hover:scale-110" />
               <span className="font-medium">Cart</span>
@@ -159,6 +197,7 @@ export function Header({
       {/* Phones flyout (desktop/tablet only) */}
       {showPhones && (
         <div
+          ref={flyoutRef}
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[min(92vw,28rem)] bg-white border rounded-xl shadow-xl p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1 z-50"
         >
           {availablePhones?.length ? (
