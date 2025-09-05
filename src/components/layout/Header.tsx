@@ -34,6 +34,7 @@ export function Header({
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [mobileStep, setMobileStep] = React.useState<MobileStep>("root");
   const [mounted, setMounted] = React.useState(false);
+  const [intermType, setIntermType] = React.useState<string>("")
   const { cartCount } = useCart()
 
   useEffect(() => setMounted(true), []);
@@ -59,18 +60,19 @@ export function Header({
   };
 
   const desktopPickType = (t: "Case" | "Glass", showPhonePicker: boolean) => {
-    setType(t);
+    setIntermType(t);
     setShowPhones(showPhonePicker);
   };
   
   const mobilePickType = (t: "Case" | "Glass") => {
-    setType(t);
+    setIntermType(t);
     setMobileStep("phones");
   };
   
 
   const choosePhone = (ph: string) => {
-    type && router.push(`/shop/${typeToSlug(type)}/${phoneToSlug(ph)}`);
+    intermType && router.push(`/shop/${typeToSlug(intermType)}/${phoneToSlug(ph)}`);
+    setType(intermType)
     setPhone?.(ph);
     setShowPhones(false);
     setMobileOpen(false);
@@ -107,7 +109,7 @@ export function Header({
           </span>
           <span
             className="cursor-pointer font-medium hover:underline underline-offset-4 text-gray-700"
-            onClick={() => desktopPickType("Glass", false)}
+            onClick={() => desktopPickType("Glass", true)}
           >
             Zaštitno staklo
           </span>
