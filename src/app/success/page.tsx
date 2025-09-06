@@ -23,7 +23,6 @@ function SuccessContent() {
   // close the drawer on mount
   useEffect(() => {
     setCartOpen(false);
-    clear();
   }, [setCartOpen]);
 
   // clear cart once when completed
@@ -31,6 +30,7 @@ function SuccessContent() {
   useEffect(() => {
     if (status === "COMPLETED" && !clearedRef.current) {
       clearedRef.current = true;
+      clear();
     }
   }, [status]);
 
