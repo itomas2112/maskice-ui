@@ -76,7 +76,7 @@ const PrivacyPolicy: React.FC = () => {
       <ul className="list-disc ml-6 mb-4">
         <li>pristup svojim podacima</li>
         <li>ispravak ili dopunu podataka</li>
-        <li>brisanje podataka ("pravo na zaborav")</li>
+        <li>brisanje podataka (pravo na zaborav)</li>
         <li>ograničenje obrade podataka</li>
         <li>prenosivost podataka</li>
         <li>pravo na prigovor u marketinške svrhe</li>

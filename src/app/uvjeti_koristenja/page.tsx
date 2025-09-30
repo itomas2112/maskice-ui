@@ -46,7 +46,7 @@ const TermsOfService: React.FC = () => {
       <LastUpdated />
 
       <p className="mt-6">
-        Ovim općim uvjetima uređuju se odnosi između kupca ("Kupac") i trgovca ("Trgovac")
+        Ovim općim uvjetima uređuju se odnosi između kupca (Kupac) i trgovca (Trgovac)
         vezano uz korištenje internetske trgovine {BUSINESS.brand}, uvjete i način naručivanja
         proizvoda, cijene, plaćanje, isporuku, odgovornost za materijalne nedostatke,
         reklamacije, raskid ugovora, zaštitu osobnih podataka te druga pitanja bitna za sklapanje
