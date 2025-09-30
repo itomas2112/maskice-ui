@@ -98,10 +98,10 @@ export default function LikedPage() {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold">Favorites</h1>
+          <h1 className="text-xl font-semibold">Favoriti</h1>
           {likedIds.length > 0 && (
             <Button variant="outline" onClick={clearFavorites} className="cursor-pointer">
-              Clear favorites
+              Očisti favorite
             </Button>
           )}
         </div>
@@ -110,7 +110,7 @@ export default function LikedPage() {
           <LoadingGrid count={6} />
         ) : likedProducts.length === 0 ? (
           <div className="text-gray-600">
-            You haven’t liked any products yet. Go back and tap the heart on a product to save it here.
+            Nije lajkan nijedan proizvod još. Vrati se nazad kako bi stisnuo/la srce na proizvodu i spremio/la ga u favorite.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-2">

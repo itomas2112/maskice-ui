@@ -103,7 +103,7 @@ export function Header({
     "active:scale-[0.98] cursor-pointer select-none";
   const glassActive =
     "bg-white/40 text-gray-900 border-white/50 ring-2 ring-black/10 font-semibold";
-  console.log(type)
+
   return (
     <header className="relative sticky top-0 z-40 border-b border-black/5 bg-white/60 backdrop-blur">
       {/* Top bar */}
@@ -171,7 +171,7 @@ export function Header({
               className="relative cursor-pointer rounded-full h-11 pl-6 pr-7 min-w-[15vh] shadow-sm hover:shadow-md transition hover:bg-black/5 active:scale-[0.98] group"
             >
               <ShoppingCart className="mr-2 h-5 w-5 transition-transform group-hover:scale-110" />
-              <span className="font-medium">Cart</span>
+              <span className="font-medium">Košarica</span>
               {cartCount > 0 && (
                 <span className="ml-2 inline-flex items-center justify-center text-[11px] leading-none w-5 h-5 rounded-full bg-black text-white ring-2 ring-white tabular-nums">
                   {cartCount}

@@ -121,7 +121,7 @@ export default function PhoneCaseStoreApp() {
               Staklo {EUR(BASE_PRICE)}.
             </h1>
             <p className={`mt-4 text-gray-600 max-w-prose ${!isMobile ? "" : "mx-auto"}`}>
-              Jednostavan dizajn. Isporuka u roku 0–2 dana.
+              Jednostavan dizajn. Isporuka u roku 0–3 dana.
             </p>
           </div>
 
