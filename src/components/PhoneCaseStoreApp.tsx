@@ -12,6 +12,7 @@ import { EUR } from "@/lib/utils";
 import { PageFooter } from "@/components/layout/Footer";
 
 const BASE_PRICE = 3.0;
+const BASE_PRICE_2 = 1.50
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="text-2xl font-bold">{children}</h2>;
@@ -118,7 +119,7 @@ export default function PhoneCaseStoreApp() {
               Maskica {EUR(BASE_PRICE)}.
             </h1>
             <h1 className="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight mb-5">
-              Staklo {EUR(BASE_PRICE)}.
+              Staklo {EUR(BASE_PRICE_2)}.
             </h1>
             <p className={`mt-4 text-gray-600 max-w-prose ${!isMobile ? "" : "mx-auto"}`}>
               Jednostavan dizajn. Isporuka u roku 0–3 dana.
