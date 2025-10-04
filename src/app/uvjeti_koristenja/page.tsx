@@ -94,13 +94,10 @@ const TermsOfService: React.FC = () => {
 
       <SectionTitle>Načini plaćanja</SectionTitle>
       <List>
-        <li>Opća uplatnica / virman / uplata u banci, pošti ili FINI.</li>
-        <li>Internet bankarstvo.</li>
-        <li>Kartično plaćanje (npr. Mastercard, Visa, Maestro) preko certificiranog pružatelja usluge naplate.</li>
-        <li>Pouzećem (ako je omogućeno).</li>
+        <li>Kartično plaćanje (npr. Mastercard, Visa, Maestro) preko certificiranog pružatelja usluge naplate (Stripe).</li>
       </List>
       <p className="text-sm text-gray-700 mt-2">
-        Kartična plaćanja obavljaju se preko sigurnog sustava treće strane (SSL, PCI-DSS). {BUSINESS.name} ne pohranjuje podatke o karticama.
+        Kartična plaćanja obavljaju se preko sigurnog sustava treće strane (Stripe). {BUSINESS.name} ne pohranjuje podatke o karticama.
       </p>
 
       <SectionTitle>Dostava i preuzimanje</SectionTitle>
