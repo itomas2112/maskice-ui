@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useShop } from "@/contexts/shop";
 import API from "@/lib/api";
 import { EUR } from "@/lib/utils";
 import { useCart } from "@/hooks/useCart"; // 👈 useCart instead of local logic
 import type { CartLineOut } from "@/hooks/useCart";
+
+// If you later move the terms route, just update this one constant.
+const TERMS_ROUTE = "/uvjeti-koristenja"; // matches app/(root)/uvjeti-koristenja/page.tsx
 
 type Customer = {
   first_name: string;
@@ -26,7 +29,7 @@ export default function CartDrawer() {
   const { cart, setQty, remove, refresh } = useCart();
 
   useEffect(() => {
-    if (cartOpen) refresh();  // important: re-pull after add and when cookie is present
+    if (cartOpen) refresh(); // important: re-pull after add and when cookie is present
   }, [cartOpen, refresh]);
 
   // Customer form state (persist to localStorage)
@@ -56,8 +59,14 @@ export default function CartDrawer() {
 
   const [creating, setCreating] = useState(false);
 
+  // ▼ New: TOS acceptance + UX/error state
+  const [acceptedTos, setAcceptedTos] = useState(false);
+  const [tosError, setTosError] = useState(false);
+  const [shakeBtn, setShakeBtn] = useState(false);
+
   const handleCheckout = async () => {
     if (!cart || cart.items.length === 0) return;
+
     if (
       !(
         customer.first_name.trim() &&
@@ -72,6 +81,16 @@ export default function CartDrawer() {
       alert("Molimo ispunite podatke za dostavu (ime, prezime, email, adresu).");
       return;
     }
+
+    // Block payment if TOS not accepted – but allow clicking to show UX feedback
+    if (!acceptedTos) {
+      setTosError(true);
+      setShakeBtn(true);
+      // stop shaking after one cycle
+      window.setTimeout(() => setShakeBtn(false), 450);
+      return;
+    }
+
     try {
       setCreating(true);
       const payload = {
@@ -166,24 +185,18 @@ export default function CartDrawer() {
                 <div className="flex items-center gap-2">
                   <button
                     className="w-7 h-7 border rounded cursor-pointer"
-                    onClick={() =>
-                      (it.qty>1)&&setQty({ ...it, qty: -1 })
-                    }
+                    onClick={() => (it.qty > 1) && setQty({ ...it, qty: -1 })}
                   >
                     −
                   </button>
                   <input
                     className="w-10 h-7 text-center border rounded"
                     value={it.qty}
-                    onChange={(e) =>
-                      setQty({ ...it, qty: Math.max(1, Number(e.target.value) || 1) })
-                    }
+                    onChange={(e) => setQty({ ...it, qty: Math.max(1, Number(e.target.value) || 1) })}
                   />
                   <button
                     className="w-7 h-7 border rounded cursor-pointer"
-                    onClick={() =>
-                      setQty({ ...it, qty: 1 })
-                    }
+                    onClick={() => setQty({ ...it, qty: 1 })}
                   >
                     +
                   </button>
@@ -193,9 +206,7 @@ export default function CartDrawer() {
 
                 <button
                   className="text-sm text-red-600 cursor-pointer"
-                  onClick={() =>
-                    remove({ product_id: it.product_id, color: it.color, model: it.model })
-                  }
+                  onClick={() => remove({ product_id: it.product_id, color: it.color, model: it.model })}
                 >
                   Ukloni
                 </button>
@@ -276,9 +287,7 @@ export default function CartDrawer() {
                   placeholder="Država (npr. HR)"
                   maxLength={2}
                   value={customer.country}
-                  onChange={(e) =>
-                    setCustomer({ ...customer, country: e.target.value.toUpperCase() })
-                  }
+                  onChange={(e) => setCustomer({ ...customer, country: e.target.value.toUpperCase() })}
                 />
               </div>
               {!formOk && (
@@ -289,14 +298,64 @@ export default function CartDrawer() {
             </div>
           )}
 
+          {/* ▼ Terms of Service acceptance */}
+          {cart && cart.items.length > 0 && (
+            <div className="mt-2">
+              <label className={`flex items-start gap-2 select-none ${tosError ? "text-red-600" : "text-gray-800"}`}>
+                <input
+                  id="accept-tos"
+                  type="checkbox"
+                  className={`mt-1 h-4 w-4 cursor-pointer border rounded ${tosError ? "border-red-600" : "border-gray-300"}`}
+                  checked={acceptedTos}
+                  onChange={(e) => {
+                    setAcceptedTos(e.target.checked);
+                    if (e.target.checked) setTosError(false);
+                  }}
+                />
+                <span className="text-sm">
+                  kupovinom kao gost, prihvaćam opće <a
+                    href={TERMS_ROUTE}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`underline ${tosError ? "text-red-700" : ""}`}
+                  >
+                    uvjete korištenja
+                  </a>.
+                </span>
+              </label>
+              {tosError && (
+                <p className="mt-1 text-xs text-red-600">
+                  Molimo potvrdite da prihvaćate opće uvjete korištenja prije plaćanja.
+                </p>
+              )}
+            </div>
+          )}
 
           <Button
-            className="w-full mt-3 cursor-pointer"
+            className={`w-full mt-3 cursor-pointer ${shakeBtn ? "btn-shake" : ""}`}
             disabled={!cart || cart.items.length === 0 || creating || !formOk}
             onClick={handleCheckout}
+            aria-live="polite"
           >
-            {creating ? "Kreiram…" : "Plati (simulacija)"}
+            {creating ? "Kreiram…" : "Plati"}
           </Button>
+
+          {/* Local styles for the shake animation */}
+          <style jsx>{`
+            @keyframes btn-shake {
+              10% { transform: translateX(-4px); }
+              20% { transform: translateX(4px); }
+              30% { transform: translateX(-4px); }
+              40% { transform: translateX(4px); }
+              50% { transform: translateX(-3px); }
+              60% { transform: translateX(3px); }
+              70% { transform: translateX(-2px); }
+              80% { transform: translateX(2px); }
+              90% { transform: translateX(-1px); }
+              100%{ transform: translateX(0); }
+            }
+            .btn-shake { animation: btn-shake 0.45s linear; }
+          `}</style>
         </div>
       </aside>
     </div>
