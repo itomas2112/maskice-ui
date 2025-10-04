@@ -9,7 +9,7 @@ import { useCart } from "@/hooks/useCart"; // 👈 useCart instead of local logi
 import type { CartLineOut } from "@/hooks/useCart";
 
 // If you later move the terms route, just update this one constant.
-const TERMS_ROUTE = "/uvjeti-koristenja"; // matches app/(root)/uvjeti-koristenja/page.tsx
+const TERMS_ROUTE = "/uvjeti_koristenja"; // matches app/(root)/uvjeti-koristenja/page.tsx
 
 type Customer = {
   first_name: string;
@@ -313,7 +313,7 @@ export default function CartDrawer() {
                   }}
                 />
                 <span className="text-sm">
-                  kupovinom kao gost, prihvaćam opće <a
+                  Kupovinom kao gost, prihvaćam opće <a
                     href={TERMS_ROUTE}
                     target="_blank"
                     rel="noopener noreferrer"
