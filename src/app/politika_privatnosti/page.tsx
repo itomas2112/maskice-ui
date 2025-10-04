@@ -21,7 +21,7 @@ const PrivacyPolicy: React.FC = () => {
         Svaka osobna informacija dostavljena ili prikupljena na stranici{" "}
         <strong>maskino.com.hr</strong> je kontrolirana od strane obrta{" "}
         <strong>Freelen</strong>, registriranog u Republici Hrvatskoj, sa sjedištem u{" "}
-        <em>[upiši svoju adresu]</em>.
+        <em>Sokolgradska ulica 84, Zagreb</em>.
       </p>
 
       <h2 className="text-xl font-semibold mt-6 mb-2">
@@ -86,8 +86,8 @@ const PrivacyPolicy: React.FC = () => {
       <h2 className="text-xl font-semibold mt-6 mb-2">Povlačenje suglasnosti</h2>
       <p className="mb-4">
         Suglasnost možete opozvati u bilo kojem trenutku slanjem zahtjeva na{" "}
-        <a href="mailto:info@maskino.com.hr" className="text-blue-600 underline">
-          info@maskino.com.hr
+        <a href="mailto:maskino.cshr@gmail.com" className="text-blue-600 underline">
+          maskino.cshr@gmail.com
         </a>.
       </p>
 
@@ -95,8 +95,8 @@ const PrivacyPolicy: React.FC = () => {
       <p className="mb-4">
         <strong>Freelen – obrt za trgovinu</strong> <br />
         E-mail:{" "}
-        <a href="mailto:info@maskino.com.hr" className="text-blue-600 underline">
-          info@maskino.com.hr
+        <a href="mailto:maskino.cshr@gmail.com" className="text-blue-600 underline">
+          maskino.cshr@gmail.com
         </a>{" "}
         <br />
         Adresa: <em>Sokolgradska ulica 84, 10000 Zagreb</em>

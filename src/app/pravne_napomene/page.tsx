@@ -9,7 +9,7 @@ import { useCatalogFilters } from "@/hooks/useCatalogFilters";
 const BUSINESS = {
   name: "Freelen – obrt za trgovinu",
   brand: "maskino.com.hr",
-  email: "info@maskino.com.hr",
+  email: "maskino.cshr@gmail.com",
 };
 
 const LastUpdated: React.FC = () => {

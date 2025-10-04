@@ -10,13 +10,10 @@ import {PageFooter} from "@/components/layout/Footer";
 const BUSINESS = {
   name: "Freelen – obrt za trgovinu",
   brand: "maskino.com.hr",
-  oib: "[upiši OIB]",
-  address: "[upiši adresu, poštanski broj i grad]",
-  email: "info@maskino.com.hr",
-  phone: "[upiši kontakt telefon]",
-  iban: "[upiši IBAN]",
-  courtReg: "[po potrebi – npr. upis u Očevidnik obrta / sudski registar]",
-  deliveryCarrier: "[npr. GLS / HP Express / DPD]",
+  oib: "54570065282",
+  address: "Sokolgradska ulica 84, Zagreb",
+  email: "maskino.cshr@gmail.com",
+  deliveryCarrier: "GLS / HP Express / DPD / BoxNow i slično",
 };
 
 const LastUpdated: React.FC = () => {
@@ -64,11 +61,6 @@ const TermsOfService: React.FC = () => {
         Sjedište: {BUSINESS.address}<br />
         OIB: {BUSINESS.oib}<br />
         E-mail: <A href={`mailto:${BUSINESS.email}`}>{BUSINESS.email}</A><br />
-        Telefon: {BUSINESS.phone}<br />
-        IBAN: {BUSINESS.iban}<br />
-        {BUSINESS.courtReg && (<>
-          Registracija: {BUSINESS.courtReg}<br />
-        </>)}
         {BUSINESS.brand} nastupa u svoje ime putem internetske trgovine.
       </p>
 
