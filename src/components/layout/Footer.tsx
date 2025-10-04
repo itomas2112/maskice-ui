@@ -42,7 +42,7 @@ export function PageFooter() {
           </div>
           <div>
             <h4 className="font-semibold">Kontakt</h4>
-            <p className="mt-3 text-sm text-gray-700">Email: maskino.support@gmail.com</p>
+            <p className="mt-3 text-sm text-gray-700">Email: maskino.cshr@gmail.com</p>
             <p className="text-xs text-gray-500 mt-4">© {new Date().getFullYear()} Maskino</p>
           </div>
         </div>
